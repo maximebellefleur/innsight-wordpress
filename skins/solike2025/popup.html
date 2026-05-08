@@ -1,0 +1,15 @@
+<div class="popupContent">
+    <div class="title_holder">
+        <h3>{{title}}</h3>
+        {{#if button.url}}<a href="{{button.url}}" class="more" target="_blank" rel="noopener">{{button.text}}</a>{{/if}}
+    </div>
+    {{#if image}}<div class="img_holder"><img src="{{image}}" alt="{{title}}" loading="lazy" /></div>{{/if}}
+    <p>{{{description}}}</p>
+    {{#if actionLinks}}
+    <div class="external_action">
+        <ul>
+            {{#each actionLinks}}<li class="{{key}}"><a href="{{url}}" target="_blank" rel="noopener">{{label}}</a></li>{{/each}}
+        </ul>
+    </div>
+    {{/if}}
+</div>

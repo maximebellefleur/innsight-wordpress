@@ -1,0 +1,208 @@
+<?php
+/**
+ * @package Innsight
+ */
+
+namespace Innsight;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * JsonBuilder - turns the DataSource's intermediate shape into a v1 JSON config
+ * matching the schema documented at innsight/docs/JSON-SCHEMA.md.
+ *
+ * This is a pure transformer: no DB reads, no side effects. All data comes from
+ * the caller (DataSource) plus the persisted plugin Settings.
+ */
+final class JsonBuilder {
+
+    /**
+     * @param array $intermediate  Output of DataSource::build()
+     * @param array $shortcode_atts Shortcode attributes (provider, skin overrides, height...)
+     * @return array Encoded as JSON for window.INNSIGHT_DATA / REST response.
+     */
+    public function build( array $intermediate, array $shortcode_atts = array() ): array {
+        $settings = innsight_settings();
+
+        $requested_type = isset( $shortcode_atts['provider'] ) && in_array( $shortcode_atts['provider'], array( 'osm', 'mapbox', 'google' ), true )
+            ? $shortcode_atts['provider']
+            : (string) $settings['provider_default'];
+
+        // Defensive: if the chosen provider would cause the engine to throw
+        // (mapbox without a token, google before v0.2 ships), fall back to
+        // OpenStreetMap so the page still renders. The admin sees the active
+        // provider type in the JSON config and can investigate.
+        $provider_type = $requested_type;
+        if ( $requested_type === 'mapbox' && empty( $settings['mapbox_access_token'] ) ) {
+            $provider_type = 'osm';
+        }
+        if ( $requested_type === 'google' ) {
+            $provider_type = 'osm'; // v0.2 stub - engine throws today.
+        }
+
+        $skin_name = isset( $shortcode_atts['skin'] ) && $shortcode_atts['skin'] !== ''
+            ? sanitize_key( (string) $shortcode_atts['skin'] )
+            : (string) $settings['skin_name'];
+
+        $skin_url = $this->resolve_skin_base_url( $skin_name );
+
+        $config = array(
+            'version'      => 1,
+            'map'          => array(
+                'center'       => array(
+                    'lat' => (float) $intermediate['center']['lat'],
+                    'lon' => (float) $intermediate['center']['lon'],
+                ),
+                'zoom'         => (int) $intermediate['zoom'],
+                'minZoom'      => 2,
+                'maxZoom'      => 19,
+                'fitToBounds'  => true,
+                'fullscreen'   => true,
+            ),
+            'provider'     => $this->build_provider_config( $provider_type, $settings ),
+            'enrichment'   => $this->build_enrichment_config( $settings ),
+            'skin'         => array(
+                'name'     => $skin_name,
+                'basePath' => $skin_url,
+            ),
+            'branding'     => array(
+                'colors'  => array(
+                    'rouge' => '#da011a',
+                    'noir'  => '#3d3c3c',
+                    'bleu'  => '#1a73e8',
+                ),
+                'logoUrl' => isset( $intermediate['branding']['logoUrl'] ) ? (string) $intermediate['branding']['logoUrl'] : '',
+            ),
+            'actionLinks'  => $this->default_action_links(),
+            'filters'      => array(
+                'types'    => $this->derive_types( $intermediate['pois'] ),
+                'soloMode' => ! empty( $settings['solo_mode'] ),
+            ),
+            'ui'           => array(
+                'kmlExport'    => ! empty( $settings['kml_export'] ),
+                'layerControl' => array( 'position' => 'bottomright', 'collapsed' => false ),
+            ),
+            'pois'         => array_map( array( $this, 'shape_poi' ), $intermediate['pois'] ),
+            'paths'        => array_map( array( $this, 'shape_path' ), $intermediate['paths'] ),
+        );
+
+        /**
+         * Filter the final v1 JSON config before it's emitted.
+         *
+         * @param array $config         Final config array.
+         * @param array $intermediate   DataSource output.
+         * @param array $shortcode_atts Shortcode attributes.
+         */
+        return (array) apply_filters( 'innsight/data/config', $config, $intermediate, $shortcode_atts );
+    }
+
+    private function build_provider_config( string $type, array $settings ): array {
+        $provider = array(
+            'type'   => $type,
+            'osm'    => array(
+                'tileUrl'     => 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'attribution' => '© OpenStreetMap contributors',
+            ),
+            'mapbox' => array(
+                'accessToken' => '',
+                'styleId'     => (string) $settings['mapbox_style_id'],
+            ),
+            'google' => array(
+                'apiKey' => '',
+                'mapId'  => '',
+            ),
+        );
+
+        // Only inject sensitive tokens for the active provider so we never leak
+        // a Mapbox token in JSON when the active provider is OSM.
+        if ( $type === 'mapbox' && ! empty( $settings['mapbox_access_token'] ) ) {
+            $provider['mapbox']['accessToken'] = (string) $settings['mapbox_access_token'];
+        }
+        if ( $type === 'google' && ! empty( $settings['google_maps_api_key'] ) ) {
+            $provider['google']['apiKey'] = (string) $settings['google_maps_api_key'];
+        }
+
+        return $provider;
+    }
+
+    private function build_enrichment_config( array $settings ): array {
+        $enabled = ! empty( $settings['google_places_enable'] ) && ! empty( $settings['google_places_key'] );
+        return array(
+            'google' => array(
+                'apiKey'        => $enabled ? (string) $settings['google_places_key'] : '',
+                'fields'        => is_array( $settings['google_places_fields'] ) ? array_values( $settings['google_places_fields'] ) : array(),
+                'cacheTtlHours' => 24,
+            ),
+        );
+    }
+
+    private function default_action_links(): array {
+        return array(
+            'google' => array( 'label' => 'GMAPS',   'urlTemplate' => 'https://www.google.com/maps/dir/?api=1&destination={{lat}},{{lon}}' ),
+            'apple'  => array( 'label' => 'iOS',     'urlTemplate' => 'https://maps.apple.com/?daddr={{lat}},{{lon}}' ),
+            'mapsme' => array( 'label' => 'Maps.me', 'urlTemplate' => 'mapsme://map?ll={{lat}},{{lon}}', 'mobileOnly' => true ),
+        );
+    }
+
+    /**
+     * Derive the unique set of types from the POI list - feeds the layer control.
+     *
+     * @param array $pois
+     * @return array
+     */
+    private function derive_types( array $pois ): array {
+        $seen = array();
+        foreach ( $pois as $poi ) {
+            if ( ! empty( $poi['type'] ) ) {
+                $seen[ (string) $poi['type'] ] = true;
+            }
+        }
+        return array_keys( $seen );
+    }
+
+    private function shape_poi( array $poi ): array {
+        return array(
+            'id'            => isset( $poi['id'] ) ? (string) $poi['id'] : '',
+            'title'         => isset( $poi['title'] ) ? (string) $poi['title'] : '',
+            'lat'           => (float) $poi['lat'],
+            'lon'           => (float) $poi['lon'],
+            'description'   => isset( $poi['description'] ) ? (string) $poi['description'] : '',
+            'type'          => isset( $poi['type'] ) ? (string) $poi['type'] : 'place',
+            'category'      => isset( $poi['category'] ) ? (string) $poi['category'] : '',
+            'icon'          => isset( $poi['icon'] ) ? (string) $poi['icon'] : '',
+            'image'         => isset( $poi['image'] ) ? (string) $poi['image'] : '',
+            'button'        => array(
+                'url'  => isset( $poi['button']['url'] ) ? (string) $poi['button']['url'] : '',
+                'text' => isset( $poi['button']['text'] ) ? (string) $poi['button']['text'] : '',
+            ),
+            'pinned'        => ! empty( $poi['pinned'] ),
+            'googlePlaceId' => isset( $poi['googlePlaceId'] ) ? (string) $poi['googlePlaceId'] : '',
+        );
+    }
+
+    private function shape_path( array $path ): array {
+        $coords = array();
+        if ( ! empty( $path['coordinates'] ) && is_array( $path['coordinates'] ) ) {
+            foreach ( $path['coordinates'] as $pair ) {
+                if ( is_array( $pair ) && count( $pair ) >= 2 ) {
+                    $coords[] = array( (float) $pair[0], (float) $pair[1] );
+                }
+            }
+        }
+        return array(
+            'id'          => isset( $path['id'] ) ? (string) $path['id'] : '',
+            'title'       => isset( $path['title'] ) ? (string) $path['title'] : '',
+            'color'       => isset( $path['color'] ) ? (string) $path['color'] : '#3d3c3c',
+            'coordinates' => $coords,
+        );
+    }
+
+    private function resolve_skin_base_url( string $skin_name ): string {
+        $settings = innsight_settings();
+        if ( $settings['engine_source'] === 'custom' && ! empty( $settings['skin_url'] ) ) {
+            return trailingslashit( (string) $settings['skin_url'] );
+        }
+        // Default to the bundled skin folder.
+        return trailingslashit( INNSIGHT_URL . 'skins/' . $skin_name );
+    }
+}

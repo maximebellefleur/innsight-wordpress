@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+.vscode/
+.idea/
+*.log
+.env
+.env.local
+yuna-innsight.zip
