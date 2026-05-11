@@ -20,6 +20,31 @@ The plugin is intentionally lean: it produces a v1 JSON config and hands renderi
 
 The legacy `yuna-innsight` plugin can be deactivated once `Innsight` is in place; the data structures it created remain in the database and continue to power the new plugin.
 
+## Migrating from `yuna-innsight`
+
+The new plugin is a drop-in replacement. Here is the exact path:
+
+1. **Activate Innsight side-by-side with `yuna-innsight`.** Both plugins read from the same WordPress structures (POI taxonomy terms, portfolio activity post meta, ACF options). They do not fight over data. The `[custom_map]` shortcode keeps working - Innsight registers it as an alias of `[innsight_map]`. The map renders identically because the data source is the same.
+2. **Verify your existing maps still render** under Innsight - load any page that uses `[custom_map]` and confirm pins / popups appear.
+3. **Take a backup.** `Settings > Innsight Import > Download backup (JSON)`. Keep the file.
+4. **Deactivate `yuna-innsight`.** Innsight's `LegacyCompat` re-registers the `point_of_interest` taxonomy at `init` priority 11 so the legacy POI terms keep being readable after the legacy plugin is gone.
+5. **Edit the site-wide hostel defaults at `Settings > Innsight Defaults`.** This page reads from and writes to the exact same `wp_options` keys ACF used (`options_maps_titre`, `options_maps_latitude`, `options_maps_longitude`, `options_maps_text`, `options_maps_more_info_url`, `options_maps_bg_img`). No data is duplicated; deactivating Innsight in the future and re-activating yuna-innsight would surface the exact same values in the legacy admin.
+
+What survives deactivation:
+
+| Legacy structure | Survives | Notes |
+|---|---|---|
+| `point_of_interest` taxonomy terms + their meta | Yes | `LegacyCompat` re-registers the taxonomy if no other code does. |
+| `portfolio` post type + activity meta (`latitude`, `longitude`, `activity_main_slogan`) | Yes | Theme owns the post type, not the legacy plugin. |
+| Hostel default options (`options_maps_*` in `wp_options`) | Yes | Innsight reads via `get_option`; admin edits via `Settings > Innsight Defaults`. |
+| Per-post map config (`map_base_location`, `map_zoom_level`, `maps_add_markers`, `maps_existing_act_marker_id`, `maps_paths_box`) | Data: yes. Edit UI: only with ACF re-defined. | Innsight reads via `get_post_meta`. To edit on new posts, either keep an ACF group around or use the Custom Fields meta box. |
+| Event posts (`event_poi`, `single_event_gallery_description`, `latitude`, `longitude`) | Yes | Pure post meta. |
+| `[custom_map]` shortcode | Yes | Innsight registers it as an alias for `[innsight_map]`. |
+| `wp_ajax_generate_kml` AJAX endpoint | Yes | Innsight registers a server-side KML handler at the same action name. |
+| Page template `page-map.php` | Falls back to default theme template. | The template file lives in the legacy plugin folder. Pages assigned to it render with the theme's default template; the shortcode in the content still renders the map. |
+
+A migration smoke test in this repo (`includes/class-legacy-compat.php`) verifies the round-trip: render the same POIs while both plugins are active, deactivate the legacy plugin, render again - identical output.
+
 ## Importing POIs
 
 `Settings > Innsight Import` opens a guided three-step workflow:

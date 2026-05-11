@@ -49,6 +49,10 @@ final class Plugin {
     private $poi_exporter;
     /** @var ImportPage */
     private $import_page;
+    /** @var LegacyCompat */
+    private $legacy_compat;
+    /** @var DefaultsPage */
+    private $defaults_page;
     /** @var bool */
     private $booted = false;
 
@@ -85,6 +89,8 @@ final class Plugin {
         $this->poi_importer    = new PoiImporter();
         $this->poi_exporter    = new PoiExporter();
         $this->import_page     = new ImportPage( $this->poi_importer, $this->poi_exporter );
+        $this->legacy_compat   = new LegacyCompat();
+        $this->defaults_page   = new DefaultsPage();
 
         /**
          * Allow extensions to swap any service before hook registration.
@@ -108,11 +114,19 @@ final class Plugin {
             'poi_importer'    => $this->poi_importer,
             'poi_exporter'    => $this->poi_exporter,
             'import_page'     => $this->import_page,
+            'legacy_compat'   => $this->legacy_compat,
+            'defaults_page'   => $this->defaults_page,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
         }
 
+        // Front-of-house: legacy compat must register BEFORE the post type so
+        // the `point_of_interest` taxonomy is available the moment WP fires
+        // the `init` action chain. Both run on `init` but the LegacyCompat
+        // adds itself at priority 11 (after legacy plugin's 10) so it never
+        // fights an already-active legacy install.
+        $this->legacy_compat->register();
         $this->poi_post_type->register();
         $this->shortcode->register();
         $this->rest_controller->register();
@@ -120,6 +134,7 @@ final class Plugin {
         $this->assets->register();
         if ( is_admin() ) {
             $this->admin->register();
+            $this->defaults_page->register();
             $this->poi_exporter->register();
             $this->import_page->register();
         }
@@ -131,6 +146,12 @@ final class Plugin {
     public function json_builder(): JsonBuilder { return $this->json_builder; }
     public function skin_partials(): SkinPartials { return $this->skin_partials; }
     public function assets(): Assets { return $this->assets; }
+    public function legacy_compat(): LegacyCompat { return $this->legacy_compat; }
+    public function defaults_page(): DefaultsPage { return $this->defaults_page; }
+    public function poi_post_type(): PoiPostType { return $this->poi_post_type; }
+    public function poi_importer(): PoiImporter { return $this->poi_importer; }
+    public function poi_exporter(): PoiExporter { return $this->poi_exporter; }
+    public function import_page(): ImportPage { return $this->import_page; }
 
     private function __clone() {}
     public function __wakeup() { throw new \RuntimeException( 'Cannot unserialize Innsight\\Plugin' ); }

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Drop-in replacement for `yuna-innsight`.** New `LegacyCompat` class
+  re-registers the `point_of_interest` taxonomy at `init` priority 11 if no
+  other code does, so existing POI terms keep being readable after the
+  legacy plugin is deactivated. Verified end-to-end with a migration smoke
+  test: same POI count, same hostel center, same titles before vs after
+  legacy deactivation.
+- **`Settings > Innsight Defaults`** admin page edits the legacy
+  `options_maps_titre`, `options_maps_latitude`, `options_maps_longitude`,
+  `options_maps_text`, `options_maps_more_info_url`, `options_maps_bg_img`
+  values directly via the WP Settings API. No data duplication: writes hit
+  the exact same `wp_options` rows ACF wrote to when yuna-innsight was
+  active, so reactivating the legacy plugin surfaces the same values.
 - **`poi` custom post type** registered with full meta map (lat, lon, fclass,
   mapcategory, mapcategory_normalized, description_de, description_en,
   website, website2, maps_url, osm_id, osm_code) and REST support.
