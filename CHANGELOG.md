@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+- **`poi` custom post type** registered with full meta map (lat, lon, fclass,
+  mapcategory, mapcategory_normalized, description_de, description_en,
+  website, website2, maps_url, osm_id, osm_code) and REST support.
+- **POI Importer** (`Settings > Innsight Import`) with a guided three-step
+  flow:
+  1. **Backup first.** A "Download backup (JSON)" button at the top of the
+     page exports every existing POI post + every legacy
+     `point_of_interest` taxonomy term as a self-describing JSON file.
+  2. **Upload.** Accepts CSV (semicolon or comma separated, header row
+     required) or JSON (array of POI objects, or `{ "pois": [...] }`).
+     Encoding is auto-normalized (UTF-8 / Windows-1252 / ISO-8859-1).
+  3. **Map fields and preview.** Auto-suggests source-column to POI-field
+     mappings using a regex catalog (handles common variants including the
+     typo `webiste2 -> website2`); the admin can override every row from a
+     dropdown. The first 5 rows are rendered as a preview table so the
+     mapping is visually verifiable before executing.
+- **Idempotent imports.** Re-running the same import updates existing posts
+  rather than creating duplicates. Match priority: `osm_id` first; falls
+  back to exact title + lat/lon proximity (~11 m).
+- **Category normalization.** `mapcategory` values like `bars_and_pubs` are
+  auto-normalized into the design's 5 buckets (drinks/eats/sights/shops/
+  events) when `mapcategory_normalized` is left blank. Mapping is filterable
+  via `innsight/poi/category_map`.
+- **Bundled sample.** `sample-data/frankfurt-pois.csv` (116 POIs across
+  bars, cafes, restaurants, nightlife, stores, activities) and the equivalent
+  `sample-data/frankfurt-pois.json` ship with the plugin and are linked
+  from the import page.
+- **DataSource extended.** Multi viewmode now also reads from the new `poi`
+  post type and emits its markers alongside legacy taxonomy terms +
+  portfolio activities.
+- **JsonBuilder extended.** Adds a `categories[]` field to the v1 JSON
+  output for skins (innsight2026) that render category chips. Filterable
+  via `innsight/data/categories`.
+
 ## 0.1.0 - 2026-05-08
 
 Initial release.

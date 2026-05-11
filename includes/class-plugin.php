@@ -41,6 +41,14 @@ final class Plugin {
     private $kml_export;
     /** @var Admin */
     private $admin;
+    /** @var PoiPostType */
+    private $poi_post_type;
+    /** @var PoiImporter */
+    private $poi_importer;
+    /** @var PoiExporter */
+    private $poi_exporter;
+    /** @var ImportPage */
+    private $import_page;
     /** @var bool */
     private $booted = false;
 
@@ -63,16 +71,20 @@ final class Plugin {
 
         load_plugin_textdomain( 'innsight', false, dirname( plugin_basename( INNSIGHT_FILE ) ) . '/languages' );
 
-        $this->translator     = new Translator();
-        $this->geocoder       = new Geocoder();
-        $this->data_source    = new DataSource( $this->translator, $this->geocoder );
-        $this->json_builder   = new JsonBuilder();
-        $this->skin_partials  = new SkinPartials();
-        $this->assets         = new Assets();
-        $this->shortcode      = new Shortcode( $this->data_source, $this->json_builder, $this->skin_partials, $this->assets );
+        $this->translator      = new Translator();
+        $this->geocoder        = new Geocoder();
+        $this->data_source     = new DataSource( $this->translator, $this->geocoder );
+        $this->json_builder    = new JsonBuilder();
+        $this->skin_partials   = new SkinPartials();
+        $this->assets          = new Assets();
+        $this->shortcode       = new Shortcode( $this->data_source, $this->json_builder, $this->skin_partials, $this->assets );
         $this->rest_controller = new RestController( $this->data_source, $this->json_builder );
-        $this->kml_export     = new KmlExport( $this->data_source );
-        $this->admin          = new Admin();
+        $this->kml_export      = new KmlExport( $this->data_source );
+        $this->admin           = new Admin();
+        $this->poi_post_type   = new PoiPostType();
+        $this->poi_importer    = new PoiImporter();
+        $this->poi_exporter    = new PoiExporter();
+        $this->import_page     = new ImportPage( $this->poi_importer, $this->poi_exporter );
 
         /**
          * Allow extensions to swap any service before hook registration.
@@ -92,17 +104,24 @@ final class Plugin {
             'rest_controller' => $this->rest_controller,
             'kml_export'      => $this->kml_export,
             'admin'           => $this->admin,
+            'poi_post_type'   => $this->poi_post_type,
+            'poi_importer'    => $this->poi_importer,
+            'poi_exporter'    => $this->poi_exporter,
+            'import_page'     => $this->import_page,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
         }
 
+        $this->poi_post_type->register();
         $this->shortcode->register();
         $this->rest_controller->register();
         $this->kml_export->register();
         $this->assets->register();
         if ( is_admin() ) {
             $this->admin->register();
+            $this->poi_exporter->register();
+            $this->import_page->register();
         }
     }
 

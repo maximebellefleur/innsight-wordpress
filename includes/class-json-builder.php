@@ -74,6 +74,7 @@ final class JsonBuilder {
                 'logoUrl' => isset( $intermediate['branding']['logoUrl'] ) ? (string) $intermediate['branding']['logoUrl'] : '',
             ),
             'actionLinks'  => $this->default_action_links(),
+            'categories'   => $this->build_categories( $skin_name ),
             'filters'      => array(
                 'types'    => $this->derive_types( $intermediate['pois'] ),
                 'soloMode' => ! empty( $settings['solo_mode'] ),
@@ -164,10 +165,12 @@ final class JsonBuilder {
         return array(
             'id'            => isset( $poi['id'] ) ? (string) $poi['id'] : '',
             'title'         => isset( $poi['title'] ) ? (string) $poi['title'] : '',
+            'name'          => isset( $poi['name'] ) ? (string) $poi['name'] : ( isset( $poi['title'] ) ? (string) $poi['title'] : '' ),
             'lat'           => (float) $poi['lat'],
             'lon'           => (float) $poi['lon'],
             'description'   => isset( $poi['description'] ) ? (string) $poi['description'] : '',
             'type'          => isset( $poi['type'] ) ? (string) $poi['type'] : 'place',
+            'cat'           => isset( $poi['cat'] ) ? (string) $poi['cat'] : '',
             'category'      => isset( $poi['category'] ) ? (string) $poi['category'] : '',
             'icon'          => isset( $poi['icon'] ) ? (string) $poi['icon'] : '',
             'image'         => isset( $poi['image'] ) ? (string) $poi['image'] : '',
@@ -178,6 +181,27 @@ final class JsonBuilder {
             'pinned'        => ! empty( $poi['pinned'] ),
             'googlePlaceId' => isset( $poi['googlePlaceId'] ) ? (string) $poi['googlePlaceId'] : '',
         );
+    }
+
+    /**
+     * Per-skin category palette. The innsight2026 skin's chip filter and
+     * sheet meta row read this from the JSON. Filterable for sites that want
+     * to brand their own buckets.
+     *
+     * @return array<int,array{id:string,label:string,color:string}>
+     */
+    private function build_categories( string $skin_name ): array {
+        $defaults = array(
+            'innsight2026' => array(
+                array( 'id' => 'eats',   'label' => 'Eats',   'color' => '#FF6B3D' ),
+                array( 'id' => 'drinks', 'label' => 'Drinks', 'color' => '#C9F73F' ),
+                array( 'id' => 'sights', 'label' => 'Sights', 'color' => '#6BB7FF' ),
+                array( 'id' => 'shops',  'label' => 'Shops',  'color' => '#FF4D8F' ),
+                array( 'id' => 'events', 'label' => 'Events', 'color' => '#B07AFF' ),
+            ),
+        );
+        $cats = isset( $defaults[ $skin_name ] ) ? $defaults[ $skin_name ] : array();
+        return (array) apply_filters( 'innsight/data/categories', $cats, $skin_name );
     }
 
     private function shape_path( array $path ): array {

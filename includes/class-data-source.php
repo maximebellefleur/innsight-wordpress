@@ -381,12 +381,78 @@ final class DataSource {
             }
         }
 
+        // POIs from the new `poi` post type (created by the importer).
+        if ( post_type_exists( PoiPostType::POST_TYPE ) ) {
+            $poi_query = new \WP_Query( array(
+                'post_type'      => PoiPostType::POST_TYPE,
+                'posts_per_page' => -1,
+                'post_status'    => 'publish',
+                'no_found_rows'  => true,
+                'meta_query'     => array(
+                    'relation' => 'AND',
+                    array( 'key' => 'lat', 'compare' => 'EXISTS' ),
+                    array( 'key' => 'lon', 'compare' => 'EXISTS' ),
+                ),
+            ) );
+            foreach ( $poi_query->posts as $post ) {
+                $marker = $this->poi_post_to_marker( (int) $post->ID );
+                if ( $marker !== null ) {
+                    $pois[] = $marker;
+                }
+            }
+        }
+
         return $pois;
     }
 
     /* ------------------------------------------------------------------ *
      *   Per-source builders                                              *
      * ------------------------------------------------------------------ */
+
+    /**
+     * Convert a `poi` custom post (created via the importer) into a marker.
+     * Picks the locale-appropriate description (English on en_* sites, German
+     * on de_* sites, English elsewhere). The Translator facade is still
+     * applied at the end so Transposh-style runtime translations can layer on
+     * top.
+     */
+    private function poi_post_to_marker( int $post_id ): ?array {
+        $lat = innsight_to_float( get_post_meta( $post_id, 'lat', true ) );
+        $lon = innsight_to_float( get_post_meta( $post_id, 'lon', true ) );
+        if ( $lat === null || $lon === null ) {
+            return null;
+        }
+        $de = (string) get_post_meta( $post_id, 'description_de', true );
+        $en = (string) get_post_meta( $post_id, 'description_en', true );
+        $locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+        $description = strpos( (string) $locale, 'de' ) === 0 && $de !== '' ? $de : ( $en !== '' ? $en : $de );
+        if ( $description === '' ) {
+            $description = (string) get_post_field( 'post_content', $post_id );
+        }
+        $type = (string) get_post_meta( $post_id, 'fclass', true );
+        $cat  = (string) get_post_meta( $post_id, 'mapcategory_normalized', true );
+        $btn_url = (string) ( get_post_meta( $post_id, 'website', true )
+                              ?: get_post_meta( $post_id, 'maps_url', true )
+                              ?: get_permalink( $post_id ) );
+
+        return array(
+            'id'          => 'poi-post-' . $post_id,
+            'title'       => $this->translator->text( get_the_title( $post_id ) ),
+            'lat'         => $lat,
+            'lon'         => $lon,
+            'description' => $this->translator->html( $description ),
+            'type'        => $type !== '' ? sanitize_key( $type ) : 'place',
+            'category'    => '',
+            'cat'         => $cat,
+            'icon'        => '',
+            'image'       => (string) get_the_post_thumbnail_url( $post_id, 'large' ),
+            'button'      => array(
+                'url'  => $this->translator->url( $btn_url ),
+                'text' => $this->translator->text( __( 'More info', 'innsight' ) ),
+            ),
+            'pinned'      => false,
+        );
+    }
 
     /**
      * Convert a point_of_interest taxonomy term into a marker.

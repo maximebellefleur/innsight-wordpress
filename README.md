@@ -20,6 +20,18 @@ The plugin is intentionally lean: it produces a v1 JSON config and hands renderi
 
 The legacy `yuna-innsight` plugin can be deactivated once `Innsight` is in place; the data structures it created remain in the database and continue to power the new plugin.
 
+## Importing POIs
+
+`Settings > Innsight Import` opens a guided three-step workflow:
+
+1. **Back up first.** Click "Download backup (JSON)" at the top of the page. The download is a self-describing JSON file containing every existing `poi` post and every legacy `point_of_interest` taxonomy term. Keep it - you can re-import it through the same screen.
+2. **Upload a CSV or JSON file.** A bundled `sample-data/frankfurt-pois.csv` (116 OpenStreetMap POIs) and an equivalent `frankfurt-pois.json` ship with the plugin and are linked from the page. Encoding is auto-normalized (UTF-8 / Windows-1252 / ISO-8859-1).
+3. **Map fields and preview.** Auto-suggested mappings appear in a table; override any row from the dropdown. The first 5 rows are rendered as a preview so the mapping is visually verifiable. Click "Import N rows" when the preview looks right.
+
+Re-running the same import is safe: existing posts are matched by `osm_id` (or, if absent, by exact title + lat/lon within ~11 m) and updated rather than duplicated.
+
+`mapcategory` values like `bars_and_pubs`, `cafes`, `german_restaurants` are auto-normalized into the design's 5 buckets (drinks/eats/sights/shops/events). Override the mapping via the `innsight/poi/category_map` filter.
+
 ## Shortcode
 
 ```text
