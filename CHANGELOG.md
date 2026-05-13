@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.4 - 2026-05-12
+
+- **Fix: stale legacy loader looping forever in PWA / on map pages.** The
+  legacy yuna-innsight `page-map.php` template adds `class="app-loading"`
+  to `<body>` and a `<div class="loader">` near the top, then relies on
+  the legacy plugin's JS to strip them on `window.load`. With Innsight
+  overriding the `[custom_map]` shortcode, the legacy JS no longer
+  enqueues, so the body class persists and the loader animates the
+  `slide` keyframe forever - the page looks like it never finishes
+  loading. The engine now defensively strips `body.app-loading` and
+  hides any standalone `.loader` element outside its shortcode container
+  on the `ready` event. No-op on non-legacy installs.
+
 ## 0.4.3 - 2026-05-12
 
 - **Categories now derived dynamically from actual POI types** (matches the

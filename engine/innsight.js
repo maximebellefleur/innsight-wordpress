@@ -144,6 +144,16 @@
                 setTimeout(function () { hooks.loader.classList.remove('app-loading'); hooks.loader.style.display = 'none'; }, 300);
             }
 
+            // 10b) Legacy yuna-innsight cleanup. The legacy page-map.php
+            // template puts class="app-loading" on <body> + a top-level
+            // <div class="loader"> and relies on its own JS to strip them
+            // on window.load. When the new plugin handles the shortcode the
+            // legacy JS never enqueues, so the body keeps the class and the
+            // .loader animates the slide keyframe forever (looks like a
+            // stuck PWA splash). Defensive cleanup, no-op on non-legacy
+            // installs.
+            cleanupLegacyLoader(target);
+
             state.ready = true;
             state.events.emit('ready', state.instance);
 
@@ -158,6 +168,25 @@
             if (root.console) root.console.error('[innsight] bootstrap failed:', err);
             throw err;
         });
+    }
+
+    function cleanupLegacyLoader(targetEl) {
+        try {
+            if (root.document && root.document.body) {
+                root.document.body.classList.remove('app-loading');
+            }
+            if (!root.document || !targetEl) return;
+            var loaders = root.document.querySelectorAll('.loader');
+            for (var i = 0; i < loaders.length; i++) {
+                // Only hide loaders OUTSIDE our shortcode target so we don't
+                // touch a host-page element that happens to share the class.
+                if (!targetEl.contains(loaders[i])) {
+                    loaders[i].style.display = 'none';
+                }
+            }
+        } catch (e) {
+            if (root.console) root.console.warn('[innsight] legacy loader cleanup:', e);
+        }
     }
 
     function applyBranding(target, branding) {
