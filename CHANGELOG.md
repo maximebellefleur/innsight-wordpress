@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.9 - 2026-05-12
+
+Saved tab is real now.
+
+- **Tab "Saved" renders the kept POIs as a list**, sorted most-recent-
+  first. Same row template as the List tab so the visual stays
+  consistent. Tap a row -> bottom sheet opens for that POI.
+- **30-day TTL with auto-purge.** Each saved entry carries a `savedAt`
+  timestamp. On every read of the Saved list, entries older than 30 days
+  are filtered out AND the storage object is rewritten to hygiene-purge
+  them. So the tab never shows stale rows and localStorage doesn't grow
+  forever.
+- **Self-contained snapshots.** When you save a POI we now store
+  enough fields (lat, lon, image, imageThumb, cat, type, tag, blurb,
+  rating, button) to render the saved row + re-open the sheet WITHOUT
+  needing the original POI in the live data. Removing the POI from the
+  WP DB doesn't break what you already saved.
+- **Distance-from-base on saved rows** when a hostel reference exists.
+- **Saving / unsaving from the sheet auto-refreshes the Saved tab** if
+  it's the active route.
+- **PWA-friendly.** localStorage persists across PWA relaunches and
+  tab restarts. Key: `innsight.savedPois` (one JSON object keyed by
+  POI id). Survives until the user clears site data or hits
+  localStorage quota (~5-10 MB; we'll never get close).
+
 ## 0.4.8 - 2026-05-12
 
 - **Fullscreen now fullscreens the .in-app element only**, not the host

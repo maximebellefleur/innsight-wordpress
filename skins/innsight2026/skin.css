@@ -759,7 +759,6 @@
     text-align: center;
     padding: 110px 32px 130px;
 }
-.in-app.is-route-save .in-screen-empty,
 .in-app.is-route-me   .in-screen-empty { display: flex; }
 .in-empty__tile {
     width: 84px; height: 84px;
@@ -965,6 +964,46 @@ body.innsight-sheet-locked {
     color: var(--in-mute);
     font-variant-numeric: tabular-nums;
 }
+
+/* ── Saved tab ───────────────────────────────────────────────────────────── */
+.in-saved {
+    position: absolute;
+    inset: 0;
+    background: var(--in-bg);
+    z-index: 60;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-top: 54px;
+    padding-bottom: 110px;
+    transform: translateX(100%);
+    transition: transform 320ms cubic-bezier(.32, .72, .2, 1);
+    pointer-events: none;
+}
+.in-app.is-route-save .in-saved {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+.in-saved__head { padding: 0 0 4px; }
+.in-saved__rows { padding: 4px 16px 130px; }
+.in-saved__rows .in-list__empty { padding: 60px 12px; text-align: center; color: var(--in-mute);
+    font-family: var(--in-font-display); font-style: italic; font-size: 22px; }
+
+/* Inline "Remove" affordance on each saved row - tap the heart-cross icon
+ * to unsave without opening the sheet. */
+.in-row__remove {
+    background: transparent;
+    border: 0;
+    color: var(--in-mute2);
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: color 160ms, background 160ms;
+}
+.in-row__remove:hover { color: var(--in-closed); background: rgba(180, 59, 59, 0.08); }
 
 /* Google Maps "View on" link below the sheet actions. Subtle, not a button. */
 .in-sheet__gmaps {

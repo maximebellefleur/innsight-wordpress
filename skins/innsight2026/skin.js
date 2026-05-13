@@ -454,7 +454,7 @@
         this.app.classList.add('is-route-' + route);
 
         if (route === 'list') this.renderList();
-        if (route === 'save') this.renderEmpty('Saved', "Stickers you've kept will live here.");
+        if (route === 'save') this.renderSaved();
         if (route === 'me')   this.renderEmpty('You', "Your in-the-know profile.");
 
         // Closing the map screen also dismisses any open sheet so the user is
@@ -613,7 +613,13 @@
 
     /* ── Save / localStorage / toast ─────────────────────────────────────── */
     var SAVED_KEY = 'innsight.savedPois';
+    var SAVED_TTL_MS = 30 * 24 * 60 * 60 * 1000;  // 30 days
 
+    /**
+     * Raw read - returns the storage object as-is. Used by isPoiSaved
+     * for a cheap "is this id in there" check; the heavy filtering +
+     * auto-purge happens in readSavedList.
+     */
     SkinController.prototype.readSaved = function () {
         try { return JSON.parse(root.localStorage.getItem(SAVED_KEY) || '{}') || {}; }
         catch (e) { return {}; }
@@ -625,25 +631,75 @@
 
     SkinController.prototype.isPoiSaved = function (poi) {
         var saved = this.readSaved();
-        return !!(poi && saved[ String(poi.id) ]);
+        var entry = poi && saved[ String(poi.id) ];
+        if (!entry) return false;
+        // Stale entries past TTL are considered "not saved" - they'll be
+        // purged the next time the Saved tab opens.
+        return (Date.now() - (entry.savedAt || 0)) <= SAVED_TTL_MS;
+    };
+
+    /**
+     * Returns the saved POIs as a freshly-purged array sorted most-
+     * recent-first. Persists the auto-purge so the next read is cheap.
+     * Each entry carries enough fields (lat/lon/image/cat/type) to
+     * render the saved row WITHOUT looking up the original POI - so
+     * deleting a POI from the WP DB doesn't break the saved view.
+     */
+    SkinController.prototype.readSavedList = function () {
+        var saved = this.readSaved();
+        var now = Date.now();
+        var fresh = {};
+        var list = [];
+        var purged = false;
+        Object.keys(saved).forEach(function (id) {
+            var entry = saved[id];
+            if (!entry || !entry.savedAt) { purged = true; return; }
+            if (now - entry.savedAt > SAVED_TTL_MS) { purged = true; return; }
+            fresh[id] = entry;
+            list.push(entry);
+        });
+        if (purged) this.writeSaved(fresh);
+        list.sort(function (a, b) { return (b.savedAt || 0) - (a.savedAt || 0); });
+        return list;
     };
 
     SkinController.prototype.toggleSavedPoi = function (poi, btn) {
         var saved = this.readSaved();
         var id = String(poi.id);
-        if (saved[id]) {
+        if (saved[id] && (Date.now() - (saved[id].savedAt || 0)) <= SAVED_TTL_MS) {
             delete saved[id];
             this.writeSaved(saved);
             if (btn) { btn.classList.remove('is-saved'); btn.textContent = 'Save'; }
             this.showToast('Removed from saved');
             this.state.events.emit('sheet:save', { poi: poi, saved: false });
         } else {
-            saved[id] = { id: poi.id, title: poi.title || poi.name || '', cat: poi.cat || poi.type || '', savedAt: Date.now() };
+            // Self-contained snapshot: enough to render the saved row +
+            // re-open the sheet later, even if the POI is later removed
+            // from the live data.
+            saved[id] = {
+                id:         poi.id,
+                title:      poi.title || poi.name || '',
+                cat:        poi.cat || poi.type || '',
+                type:       poi.type || '',
+                lat:        Number(poi.lat),
+                lon:        Number(poi.lon),
+                image:      poi.image || '',
+                imageThumb: poi.imageThumb || poi.image || '',
+                rating:     poi.rating != null ? Number(poi.rating) : null,
+                tag:        poi.tag || '',
+                blurb:      poi.blurb || poi.description || '',
+                description:poi.description || '',
+                button:     poi.button ? { url: poi.button.url || '', text: poi.button.text || '' } : { url: '', text: '' },
+                savedAt:    Date.now()
+            };
             this.writeSaved(saved);
             if (btn) { btn.classList.add('is-saved'); btn.textContent = 'Saved ✓'; }
             this.showToast('Saved!');
             this.state.events.emit('sheet:save', { poi: poi, saved: true });
         }
+        // If we're currently on the Saved tab, re-render it so the row
+        // appears/disappears immediately.
+        if (this.route === 'save') this.renderSaved();
     };
 
     SkinController.prototype.showToast = function (message) {
@@ -917,5 +973,121 @@
             title: title, body: body,
             initial: title.charAt(0).toLowerCase()
         });
+    };
+
+    /* ── Saved tab rendering ─────────────────────────────────────────────── */
+
+    /**
+     * Render the Saved tab. Uses the same list-row template as the List
+     * tab so the visual stays consistent. Falls back to an inline empty
+     * state when nothing is saved (no need for a separate template).
+     * Also updates the count + meta line in the head.
+     */
+    SkinController.prototype.renderSaved = function () {
+        var host        = this.target.querySelector('[data-innsight-saved]');
+        var countEl     = this.target.querySelector('[data-innsight-saved-count]');
+        var metaEl      = this.target.querySelector('[data-innsight-saved-meta]');
+        if (!host) return;
+
+        var savedList = this.readSavedList();
+        if (countEl) countEl.textContent = savedList.length;
+        if (metaEl)  metaEl.textContent  = savedList.length + (savedList.length === 1 ? ' spot' : ' spots') + ' · expires after 30 days';
+
+        if (savedList.length === 0) {
+            host.innerHTML = '<div class="in-empty" style="padding:60px 12px 0;text-align:center">'
+                + '<div class="in-empty__tile" aria-hidden="true">s</div>'
+                + '<h2 class="in-empty__title">Nothing saved yet</h2>'
+                + '<p class="in-empty__body">Tap <strong>Save</strong> on any spot to keep it here for 30 days.</p>'
+                + '</div>';
+            return;
+        }
+
+        var template = this.state.partials.listRow || this.state.partials.listItem || '';
+        if (!template) return;
+        var palette = (this.cfg.branding && this.cfg.branding.stickerColors) ||
+            ['#FFB85C', '#FF6B3D', '#C9F73F', '#6BB7FF', '#FF4D8F', '#B07AFF', '#FFD93D', '#5EE2A8'];
+        var self = this;
+
+        var html = savedList.map(function (entry, i) {
+            var hash = 0, id = String(entry.id || entry.title || '');
+            for (var k = 0; k < id.length; k++) hash = (hash + id.charCodeAt(k)) % 1e9;
+            var color = palette[hash % palette.length];
+            var cat = self.catById[entry.cat] || self.catById[entry.type] || { label: '', color: '#0F0F0F' };
+            // Surface the original POI (if still in the live data) just for
+            // distance computation; otherwise we have the saved lat/lon.
+            var distFromHostel = '';
+            if (self.hostelRef) {
+                var poiForDist = { lat: entry.lat, lon: entry.lon, pinned: false };
+                self.computeDistanceFor(poiForDist);
+                distFromHostel = self.formatDist(poiForDist);
+            }
+            return Innsight._template.render(template, {
+                id:             entry.id,
+                title:          entry.title || '',
+                initial:        (entry.title || '·').charAt(0).toUpperCase(),
+                stickerColor:   color,
+                categoryColor:  cat.color,
+                categoryLabel:  cat.label,
+                tag:            entry.tag || '',
+                dist:           '',
+                distFromHostel: distFromHostel,
+                image:          entry.image || '',
+                imageThumb:     entry.imageThumb || entry.image || '',
+                rating:         entry.rating != null ? Number(entry.rating).toFixed(1) : '',
+                open:           '',
+                openShort:      '',
+                __index:        i
+            });
+        }).join('');
+        host.innerHTML = html;
+
+        // Wire taps -> open the sheet. Look up the live POI by id; if it
+        // no longer exists, synthesize a minimal POI from the saved entry
+        // so the sheet still opens.
+        var rows = host.querySelectorAll('[data-innsight-list-row]');
+        for (var i = 0; i < rows.length; i++) {
+            (function (row) {
+                row.addEventListener('click', function () {
+                    var id = row.getAttribute('data-poi-id');
+                    var live = (self.cfg.pois || []).find(function (p) { return String(p.id) === id; });
+                    if (live) { self.openSheet(live); return; }
+                    // Synthesize from saved snapshot.
+                    var entry = self.readSaved()[id];
+                    if (!entry) return;
+                    self.openSheet({
+                        id: entry.id, title: entry.title, name: entry.title,
+                        cat: entry.cat, type: entry.type,
+                        lat: entry.lat, lon: entry.lon,
+                        image: entry.image, imageThumb: entry.imageThumb,
+                        rating: entry.rating,
+                        tag: entry.tag,
+                        blurb: entry.blurb, description: entry.description,
+                        button: entry.button || { url: '', text: '' },
+                        open: true,
+                        __synthetic: true
+                    });
+                });
+            })(rows[i]);
+        }
+    };
+
+    /**
+     * Compute __distMeters for a POI not in the original cfg.pois array
+     * (e.g. a saved entry we're rendering). Same Haversine as
+     * annotateDistances but for one POI in-place.
+     */
+    SkinController.prototype.computeDistanceFor = function (poi) {
+        var ref = this.hostelRef;
+        if (!ref || !isFinite(poi.lat) || !isFinite(poi.lon)) return;
+        var R = 6371000;
+        var toRad = function (d) { return d * Math.PI / 180; };
+        var refLat = toRad(ref.lat), refLon = toRad(ref.lon);
+        var lat = toRad(+poi.lat), lon = toRad(+poi.lon);
+        var dLat = lat - refLat, dLon = lon - refLon;
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(refLat) * Math.cos(lat) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        poi.__distMeters = R * c;
     };
 })(typeof window !== 'undefined' ? window : this);

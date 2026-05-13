@@ -98,7 +98,29 @@
         <div class="in-list__rows" data-innsight-list></div>
     </section>
 
-    <!-- Saved / You empty-state container (skin renders into this) -->
+    <!-- Saved tab: own scrollable view, populated by skin.renderSaved().
+         Falls back to an empty state when no saved POIs exist. -->
+    <section class="in-saved" data-innsight-saved-view aria-hidden="true">
+        <div class="in-saved__head">
+            <div class="in-list__row">
+                <div class="in-wordmark">Innsight<span class="in-accent-dot">.</span></div>
+                <div class="in-spacer"></div>
+            </div>
+            <div class="in-list__title">
+                <div class="in-list__pretitle">Your kept</div>
+                <h1 class="in-list__h1"><span data-innsight-saved-count>0</span> saved <em>spots</em></h1>
+            </div>
+            <div class="in-list__sort">
+                <span class="in-list__sortlabel">SORTED BY</span>
+                <span class="in-list__sortvalue" style="text-decoration:underline var(--in-accent) 3px;text-underline-offset:3px;">Most recent</span>
+                <span class="in-spacer"></span>
+                <span class="in-list__count" data-innsight-saved-meta>0 spots · expires after 30 days</span>
+            </div>
+        </div>
+        <div class="in-saved__rows" data-innsight-saved></div>
+    </section>
+
+    <!-- "You" empty-state container (skin renders into this) -->
     <section class="in-screen-empty" data-innsight-empty aria-hidden="true"></section>
 
     <!-- POI bottom sheet -->
