@@ -97,7 +97,7 @@ final class Admin {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        echo '<div class="wrap"><h1>' . esc_html__( 'Innsight', 'innsight' ) . '</h1>';
+        echo '<div class="wrap"><h1>' . esc_html__( 'Innsight', 'innsight' ) . ' <span style="font-size:13px;font-weight:400;color:#646970;background:#f0f0f1;padding:2px 8px;border-radius:3px;vertical-align:middle">v' . esc_html( INNSIGHT_VERSION ) . '</span></h1>';
         echo '<p>' . esc_html__( 'Configure how the Innsight map engine renders inside this site. The plugin reads existing yuna-innsight DB structures (POI taxonomy, portfolio activities, ACF options) without modification.', 'innsight' ) . '</p>';
         echo '<form method="post" action="options.php">';
         settings_fields( 'innsight_settings_group' );

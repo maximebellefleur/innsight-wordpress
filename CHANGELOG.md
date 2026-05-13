@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 - 2026-05-12
+
+- Shortcode bootstrap: poll for `Innsight.init` specifically rather than the
+  namespace existing. Each engine module sets `window.Innsight = { _utils: ... }`
+  before `innsight.js` attaches `.init`; the loose `typeof Innsight === "undefined"`
+  check passed too early and threw `Innsight.init is not a function` in the
+  console.
+- Settings page header now shows the plugin version next to the "Innsight"
+  title so you can confirm at a glance which build is loaded.
+
+## 0.4.0 - 2026-05-12
 
 - **Drop-in replacement for `yuna-innsight`.** New `LegacyCompat` class
   re-registers the `point_of_interest` taxonomy at `init` priority 11 if no
