@@ -77,7 +77,7 @@ final class JsonBuilder {
                 'logoUrl' => isset( $intermediate['branding']['logoUrl'] ) ? (string) $intermediate['branding']['logoUrl'] : '',
             ),
             'actionLinks'  => $this->default_action_links(),
-            'categories'   => $this->build_categories( $skin_name ),
+            'categories'   => $this->build_categories( $skin_name, $intermediate['pois'] ),
             'filters'      => array(
                 'types'    => $this->derive_types( $intermediate['pois'] ),
                 'soloMode' => ! empty( $settings['solo_mode'] ),
@@ -200,24 +200,82 @@ final class JsonBuilder {
     }
 
     /**
-     * Per-skin category palette. The innsight2026 skin's chip filter and
-     * sheet meta row read this from the JSON. Filterable for sites that want
-     * to brand their own buckets.
+     * Build the category list the skin uses for its chip filter.
      *
+     * Strategy: derive the categories from the unique `cat` / `type` values
+     * actually present in the POI list (matches legacy yuna behavior of
+     * rendering filters dynamically from poi_type). For each derived id we
+     * pick a label + color from a known map covering both the legacy types
+     * (hostel, food, bar, ...) and the design's 5-bucket vocabulary
+     * (eats, drinks, ...). Anything unknown gets a hashed-palette color so
+     * unfamiliar custom types still render distinctly.
+     *
+     * Filterable via `innsight/data/categories` so sites can override
+     * label/color/order without touching plugin code.
+     *
+     * @param string $skin_name
+     * @param array<int,array> $pois
      * @return array<int,array{id:string,label:string,color:string}>
      */
-    private function build_categories( string $skin_name ): array {
-        $defaults = array(
-            'innsight2026' => array(
+    private function build_categories( string $skin_name, array $pois ): array {
+        // Known type -> { label, color }. Legacy yuna types first, then the
+        // innsight2026 design palette. The chip color is what shows in the
+        // filter dot AND in the popup meta row.
+        $known = array(
+            'hostel'     => array( 'label' => 'Hostel',     'color' => '#da011a' ),
+            'food'       => array( 'label' => 'Food',       'color' => '#FF6B3D' ),
+            'bar'        => array( 'label' => 'Bar',        'color' => '#C9F73F' ),
+            'activities' => array( 'label' => 'Activities', 'color' => '#B07AFF' ),
+            'place'      => array( 'label' => 'Place',      'color' => '#6BB7FF' ),
+            'transport'  => array( 'label' => 'Transport',  'color' => '#FFD93D' ),
+            'hike'       => array( 'label' => 'Hike',       'color' => '#5EE2A8' ),
+            'shop'       => array( 'label' => 'Shop',       'color' => '#FF4D8F' ),
+            'public'     => array( 'label' => 'Public',     'color' => '#FFB85C' ),
+            'land'       => array( 'label' => 'Land',       'color' => '#8B8164' ),
+            'event'      => array( 'label' => 'Events',     'color' => '#B07AFF' ),
+            'city'       => array( 'label' => 'City',       'color' => '#6BB7FF' ),
+            // Innsight 2026 design vocabulary (used by the importer's
+            // mapcategory_normalized and by sites starting fresh).
+            'eats'       => array( 'label' => 'Eats',       'color' => '#FF6B3D' ),
+            'drinks'     => array( 'label' => 'Drinks',     'color' => '#C9F73F' ),
+            'sights'     => array( 'label' => 'Sights',     'color' => '#6BB7FF' ),
+            'shops'      => array( 'label' => 'Shops',      'color' => '#FF4D8F' ),
+            'events'     => array( 'label' => 'Events',     'color' => '#B07AFF' ),
+        );
+        $palette = array( '#FF6B3D', '#C9F73F', '#6BB7FF', '#FF4D8F', '#B07AFF', '#FFD93D', '#5EE2A8', '#FFB85C' );
+
+        // Unique types seen in the POI list, preserving insertion order.
+        $seen = array();
+        foreach ( $pois as $poi ) {
+            $id = isset( $poi['cat'] ) && $poi['cat'] !== '' ? (string) $poi['cat'] : ( isset( $poi['type'] ) ? (string) $poi['type'] : '' );
+            if ( $id === '' || isset( $seen[ $id ] ) ) continue;
+            $seen[ $id ] = true;
+        }
+
+        $cats = array();
+        $palette_idx = 0;
+        foreach ( array_keys( $seen ) as $id ) {
+            if ( isset( $known[ $id ] ) ) {
+                $cats[] = array( 'id' => $id, 'label' => $known[ $id ]['label'], 'color' => $known[ $id ]['color'] );
+            } else {
+                $cats[] = array( 'id' => $id, 'label' => ucfirst( $id ), 'color' => $palette[ $palette_idx % count( $palette ) ] );
+                $palette_idx++;
+            }
+        }
+
+        // No POIs at all -> emit the design's 5-bucket fallback so the chip
+        // strip is not empty in the empty state.
+        if ( empty( $cats ) && $skin_name === 'innsight2026' ) {
+            $cats = array(
                 array( 'id' => 'eats',   'label' => 'Eats',   'color' => '#FF6B3D' ),
                 array( 'id' => 'drinks', 'label' => 'Drinks', 'color' => '#C9F73F' ),
                 array( 'id' => 'sights', 'label' => 'Sights', 'color' => '#6BB7FF' ),
                 array( 'id' => 'shops',  'label' => 'Shops',  'color' => '#FF4D8F' ),
                 array( 'id' => 'events', 'label' => 'Events', 'color' => '#B07AFF' ),
-            ),
-        );
-        $cats = isset( $defaults[ $skin_name ] ) ? $defaults[ $skin_name ] : array();
-        return (array) apply_filters( 'innsight/data/categories', $cats, $skin_name );
+            );
+        }
+
+        return (array) apply_filters( 'innsight/data/categories', $cats, $skin_name, $pois );
     }
 
     private function shape_path( array $path ): array {

@@ -564,9 +564,19 @@
     inset: 0;
     background: var(--in-bg);
     z-index: 60;
+    /* The list scrolls internally - never lets the page scroll past the
+     * shortcode container on mobile. overscroll-behavior: contain stops
+     * iOS Safari from chaining the bounce-scroll back to the document.
+     * max-height: 100dvh caps it at the dynamic viewport (accounts for
+     * iOS URL bar shrinkage) so the tab bar always stays reachable. */
+    max-height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding-top: 54px;
+    /* Leave room for the tab bar (58px tall + 22px bottom + 16px breathing). */
+    padding-bottom: 110px;
     transform: translateX(100%);
     transition: transform 320ms cubic-bezier(.32, .72, .2, 1);
     pointer-events: none;

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.3 - 2026-05-12
+
+- **Categories now derived dynamically from actual POI types** (matches the
+  legacy yuna behavior of building filters from `poi_type`). Previously the
+  innsight2026 chip strip was hardcoded to the design's 5 buckets
+  (eats/drinks/sights/shops/events), which never matched legacy yuna
+  installs whose POIs use types like `hostel`, `food`, `bar`, `activities`,
+  `place`, `transport`, `hike`, `shop`. Now `JsonBuilder` walks the POI
+  list, collects unique types, and assigns label + color from a known map
+  covering both vocabularies. Unknown types get a hashed-palette color.
+  Filterable via `innsight/data/categories`.
+- **Mobile: list view caps at 100dvh + scroll containment.** The
+  `.in-list` rule gains `max-height: 100dvh`, `overscroll-behavior: contain`
+  (prevents iOS Safari scroll-chaining to the page), and a 110px
+  `padding-bottom` so the tab bar stays reachable above the last row.
+
 ## 0.4.2 - 2026-05-12
 
 - **Top-level "Innsight" admin menu** with a custom compass SVG icon.
