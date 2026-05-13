@@ -24,7 +24,7 @@ final class JsonBuilder {
     public function build( array $intermediate, array $shortcode_atts = array() ): array {
         $settings = innsight_settings();
 
-        $requested_type = isset( $shortcode_atts['provider'] ) && in_array( $shortcode_atts['provider'], array( 'osm', 'mapbox', 'google' ), true )
+        $requested_type = isset( $shortcode_atts['provider'] ) && in_array( $shortcode_atts['provider'], array( 'osm', 'mapbox', 'mapbox-gl', 'google' ), true )
             ? $shortcode_atts['provider']
             : (string) $settings['provider_default'];
 
@@ -34,6 +34,9 @@ final class JsonBuilder {
         // provider type in the JSON config and can investigate.
         $provider_type = $requested_type;
         if ( $requested_type === 'mapbox' && empty( $settings['mapbox_access_token'] ) ) {
+            $provider_type = 'osm';
+        }
+        if ( $requested_type === 'mapbox-gl' && empty( $settings['mapbox_access_token'] ) ) {
             $provider_type = 'osm';
         }
         if ( $requested_type === 'google' ) {
@@ -98,6 +101,11 @@ final class JsonBuilder {
     }
 
     private function build_provider_config( string $type, array $settings ): array {
+        // The bundled innsight2026 Mapbox style lives at
+        // /skins/innsight2026/mapbox-style.json. We expose its absolute URL so
+        // the engine's MapboxGLProvider can load it without an extra config.
+        $bundled_mapbox_style = INNSIGHT_URL . 'skins/innsight2026/mapbox-style.json';
+
         $provider = array(
             'type'   => $type,
             'osm'    => array(
@@ -107,6 +115,11 @@ final class JsonBuilder {
             'mapbox' => array(
                 'accessToken' => '',
                 'styleId'     => (string) $settings['mapbox_style_id'],
+            ),
+            'mapbox-gl' => array(
+                'accessToken' => '',
+                'style'       => $bundled_mapbox_style,
+                'fitPadding'  => array( 'top' => 240, 'bottom' => 110, 'left' => 28, 'right' => 70 ),
             ),
             'google' => array(
                 'apiKey' => '',
@@ -118,6 +131,9 @@ final class JsonBuilder {
         // a Mapbox token in JSON when the active provider is OSM.
         if ( $type === 'mapbox' && ! empty( $settings['mapbox_access_token'] ) ) {
             $provider['mapbox']['accessToken'] = (string) $settings['mapbox_access_token'];
+        }
+        if ( $type === 'mapbox-gl' && ! empty( $settings['mapbox_access_token'] ) ) {
+            $provider['mapbox-gl']['accessToken'] = (string) $settings['mapbox_access_token'];
         }
         if ( $type === 'google' && ! empty( $settings['google_maps_api_key'] ) ) {
             $provider['google']['apiKey'] = (string) $settings['google_maps_api_key'];

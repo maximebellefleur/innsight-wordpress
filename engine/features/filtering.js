@@ -62,13 +62,56 @@
     function setFilter(state, opts) {
         opts = opts || {};
         if (typeof opts.soloMode === 'boolean') state.soloMode = opts.soloMode;
-        if (Array.isArray(opts.types)) {
+
+        // Type / category filtering.
+        if (Array.isArray(opts.types) || typeof opts.cat === 'string') {
+            var allowed = Array.isArray(opts.types)
+                ? opts.types
+                : (opts.cat === 'all' || opts.cat === '' ? Object.keys(state.groupTypes) : [opts.cat]);
             Object.keys(state.groupTypes).forEach(function (type) {
-                if (opts.types.indexOf(type) !== -1) state.provider.showCluster(state.groupTypes[type]);
+                if (allowed.indexOf(type) !== -1) state.provider.showCluster(state.groupTypes[type]);
                 else state.provider.hideCluster(state.groupTypes[type]);
             });
-            state.events.emit('filter:change', { soloMode: state.soloMode, types: opts.types });
         }
+
+        // Substring query - applies to titles. Hides individual markers (not
+        // entire cluster groups) so cross-category search still works.
+        if (typeof opts.query === 'string') {
+            state.query = opts.query;
+            applyQuery(state);
+        }
+
+        state.events.emit('filter:change', {
+            soloMode: state.soloMode,
+            types:    Array.isArray(opts.types) ? opts.types : null,
+            cat:      typeof opts.cat === 'string' ? opts.cat : null,
+            query:    state.query || ''
+        });
+    }
+
+    /**
+     * Apply the current state.query against every marker. Markers whose title
+     * (case-insensitive) contains the query stay visible; others are detached.
+     * The engine's marker handle is provider-specific - the LeafletProvider
+     * exposes .remove() / re-add via the cluster; the MapboxGLProvider toggles
+     * the underlying DOM element. Both work via the marker handle's own
+     * .remove() method when needed.
+     */
+    function applyQuery(state) {
+        var q = (state.query || '').trim().toLowerCase();
+        state.markers.forEach(function (entry) {
+            var hit = q === '' || (entry.poi.title || entry.poi.name || '').toLowerCase().indexOf(q) !== -1;
+            // For Mapbox GL markers the DOM element exists on the marker handle.
+            if (entry.marker && entry.marker._innsightEl) {
+                entry.marker._innsightEl.style.display = hit ? '' : 'none';
+                return;
+            }
+            // For Leaflet markers (clustered), removing/adding to the cluster is
+            // expensive; instead toggle the underlying icon element.
+            if (entry.marker && entry.marker._icon) {
+                entry.marker._icon.style.display = hit ? '' : 'none';
+            }
+        });
     }
 
     Innsight._filtering = { bindEvents: bindEvents, applySolo: applySolo, setFilter: setFilter };

@@ -75,8 +75,13 @@ final class Settings {
         $clean['engine_url']           = isset( $raw['engine_url'] ) ? esc_url_raw( $raw['engine_url'] ) : '';
         $clean['engine_vendor_url']    = isset( $raw['engine_vendor_url'] ) ? esc_url_raw( $raw['engine_vendor_url'] ) : '';
         $clean['skin_url']             = isset( $raw['skin_url'] ) ? esc_url_raw( $raw['skin_url'] ) : '';
-        $clean['skin_name']            = isset( $raw['skin_name'] ) ? sanitize_key( $raw['skin_name'] ) : $defaults['skin_name'];
-        $clean['provider_default']     = in_array( $raw['provider_default'] ?? '', array( 'osm', 'mapbox', 'google' ), true ) ? $raw['provider_default'] : 'osm';
+        $clean['skin_name']            = in_array( $raw['skin_name'] ?? '', array( 'solike2025', 'innsight2026' ), true ) ? $raw['skin_name'] : $defaults['skin_name'];
+        $clean['provider_default']     = in_array( $raw['provider_default'] ?? '', array( 'osm', 'mapbox', 'mapbox-gl', 'google' ), true ) ? $raw['provider_default'] : 'osm';
+        // innsight2026 requires Mapbox GL JS. Force the provider so users
+        // don't have to know to flip two settings to get the new design.
+        if ( $clean['skin_name'] === 'innsight2026' ) {
+            $clean['provider_default'] = 'mapbox-gl';
+        }
         $clean['mapbox_access_token']  = isset( $raw['mapbox_access_token'] ) ? sanitize_text_field( $raw['mapbox_access_token'] ) : '';
         $clean['mapbox_style_id']      = isset( $raw['mapbox_style_id'] ) ? sanitize_text_field( $raw['mapbox_style_id'] ) : $defaults['mapbox_style_id'];
         $clean['google_maps_api_key']  = isset( $raw['google_maps_api_key'] ) ? sanitize_text_field( $raw['google_maps_api_key'] ) : '';

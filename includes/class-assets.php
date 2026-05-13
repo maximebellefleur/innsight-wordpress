@@ -32,9 +32,15 @@ final class Assets {
     private const HANDLE_SUBGROUP          = 'innsight-subgroup';
     private const HANDLE_FULLSCREEN        = 'innsight-fullscreen';
     private const HANDLE_FULLSCREEN_CSS    = 'innsight-fullscreen-css';
+    private const HANDLE_MAPBOX_GL         = 'innsight-mapbox-gl';
+    private const HANDLE_MAPBOX_GL_CSS     = 'innsight-mapbox-gl-css';
     private const HANDLE_ENGINE            = 'innsight-engine';
     private const HANDLE_SKIN_CSS          = 'innsight-skin-css';
     private const HANDLE_SKIN_JS           = 'innsight-skin-js';
+
+    private const MAPBOX_GL_VERSION = '3.5.1';
+    private const MAPBOX_GL_JS_URL  = 'https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.js';
+    private const MAPBOX_GL_CSS_URL = 'https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css';
 
     private const CDN_BASE = 'https://cdn.jsdelivr.net/gh/maximebellefleur/innsight@main';
 
@@ -62,6 +68,7 @@ final class Assets {
         wp_register_style( self::HANDLE_LEAFLET_CSS, $sources['leaflet']['css'], array(), $sources['leaflet']['ver'] );
         wp_register_style( self::HANDLE_MARKERCLUSTER_CSS, $sources['markercluster']['css'], array(), $sources['markercluster']['ver'] );
         wp_register_style( self::HANDLE_FULLSCREEN_CSS, $sources['fullscreen']['css'], array(), $sources['fullscreen']['ver'] );
+        wp_register_style( self::HANDLE_MAPBOX_GL_CSS, self::MAPBOX_GL_CSS_URL, array(), self::MAPBOX_GL_VERSION );
         wp_register_style( self::HANDLE_SKIN_CSS, $sources['skin']['css'], array(), $sources['skin']['ver'] );
 
         wp_register_script( self::HANDLE_LEAFLET, $sources['leaflet']['js'], array(), $sources['leaflet']['ver'], true );
@@ -69,6 +76,7 @@ final class Assets {
         wp_register_script( self::HANDLE_MC_LAYERSUPPORT, $sources['markercluster_ls']['js'], array( self::HANDLE_MARKERCLUSTER ), $sources['markercluster_ls']['ver'], true );
         wp_register_script( self::HANDLE_SUBGROUP, $sources['subgroup']['js'], array( self::HANDLE_MARKERCLUSTER ), $sources['subgroup']['ver'], true );
         wp_register_script( self::HANDLE_FULLSCREEN, $sources['fullscreen']['js'], array( self::HANDLE_LEAFLET ), $sources['fullscreen']['ver'], true );
+        wp_register_script( self::HANDLE_MAPBOX_GL, self::MAPBOX_GL_JS_URL, array(), self::MAPBOX_GL_VERSION, true );
 
         // Engine: load all engine modules through a single registered handle whose
         // src points at innsight.js, with the subordinate modules listed as inline
@@ -88,6 +96,8 @@ final class Assets {
 
     private function do_enqueue(): void {
         $sources = $this->resolve_sources();
+        $skin    = (string) innsight_settings( 'skin_name', 'solike2025' );
+        $needs_mapbox_gl = ( $skin === 'innsight2026' );
 
         if ( ! wp_script_is( 'jquery', 'registered' ) ) {
             // jQuery is normally already there; if a theme dequeued it, do nothing,
@@ -97,6 +107,9 @@ final class Assets {
         wp_enqueue_style( self::HANDLE_LEAFLET_CSS );
         wp_enqueue_style( self::HANDLE_MARKERCLUSTER_CSS );
         wp_enqueue_style( self::HANDLE_FULLSCREEN_CSS );
+        if ( $needs_mapbox_gl ) {
+            wp_enqueue_style( self::HANDLE_MAPBOX_GL_CSS );
+        }
         wp_enqueue_style( self::HANDLE_SKIN_CSS );
 
         // Re-enqueue every engine module handle so they all print.
@@ -105,6 +118,9 @@ final class Assets {
         wp_enqueue_script( self::HANDLE_MC_LAYERSUPPORT );
         wp_enqueue_script( self::HANDLE_SUBGROUP );
         wp_enqueue_script( self::HANDLE_FULLSCREEN );
+        if ( $needs_mapbox_gl ) {
+            wp_enqueue_script( self::HANDLE_MAPBOX_GL );
+        }
 
         foreach ( $sources['engine']['modules'] as $key => $_url ) {
             wp_enqueue_script( 'innsight-mod-' . $key );
@@ -174,6 +190,7 @@ final class Assets {
                     'base-provider'   => $engine_base . 'engine/providers/base-provider.js',
                     'leaflet-provider'=> $engine_base . 'engine/providers/leaflet-provider.js',
                     'mapbox-provider' => $engine_base . 'engine/providers/mapbox-provider.js',
+                    'mapbox-gl-provider' => $engine_base . 'engine/providers/mapbox-gl-provider.js',
                     'google-provider' => $engine_base . 'engine/providers/google-provider.js',
                     'provider-factory'=> $engine_base . 'engine/providers/provider-factory.js',
                     'clustering'      => $engine_base . 'engine/features/clustering.js',

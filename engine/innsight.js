@@ -76,18 +76,21 @@
             var hooks = Innsight._skinLoader.mount(target, partials);
             state.hooks = hooks;
 
-            // 2) Provider on the map element.
-            var providerOpts = {
+            // 2) Provider on the map element. Provider-specific options are
+            // pulled from cfg.provider[type] so each provider configures itself
+            // (Mapbox GL needs accessToken + style; Leaflet needs nothing extra).
+            var providerCfg = Object.assign({}, cfg.provider[cfg.provider.type] || {});
+            var providerOpts = Object.assign({
                 fullscreen: cfg.map.fullscreen,
                 mapOptions: { minZoom: cfg.map.minZoom, maxZoom: cfg.map.maxZoom },
                 mapbox: cfg.provider.mapbox
-            };
+            }, providerCfg);
             var provider = Innsight._providerFactory.create(cfg.provider.type, hooks.map, providerOpts);
             state.provider = provider;
             provider.createMap(cfg.map.center, cfg.map.zoom);
 
-            // 3) Tile layer for the chosen provider.
-            var providerCfg = cfg.provider[cfg.provider.type] || {};
+            // 3) Tile layer for the chosen provider (no-op for mapbox-gl, the
+            // style itself defines the tiles).
             providerCfg.maxZoom = cfg.map.maxZoom;
             provider.addTileLayer(providerCfg);
 

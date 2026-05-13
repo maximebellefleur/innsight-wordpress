@@ -7,15 +7,30 @@
     var DEFAULTS = {
         version: 1,
         map: { center: { lat: 0, lon: 0 }, zoom: 13, minZoom: 2, maxZoom: 19, fitToBounds: true, fullscreen: true, gestureHandling: false },
-        provider: { type: 'osm', osm: { tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap contributors' }, mapbox: { accessToken: '', styleId: 'mapbox/streets-v12' }, google: { apiKey: '', mapId: '' } },
+        provider: {
+            type: 'osm',
+            osm:        { tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap contributors' },
+            mapbox:     { accessToken: '', styleId: 'mapbox/streets-v12' },
+            'mapbox-gl': { accessToken: '', style: '', minZoom: 0, maxZoom: 22, fitPadding: { top: 240, bottom: 110, left: 28, right: 70 } },
+            google:     { apiKey: '', mapId: '' }
+        },
         enrichment: { google: { apiKey: '', fields: [], cacheTtlHours: 24 } },
         skin: { name: 'solike2025', basePath: 'skins/solike2025/' },
-        branding: { colors: { rouge: '#da011a', noir: '#3d3c3c', bleu: '#1a73e8' }, logoUrl: '' },
+        branding: {
+            colors: { rouge: '#da011a', noir: '#3d3c3c', bleu: '#1a73e8' },
+            logoUrl: '',
+            stickerColors: ['#FFB85C', '#FF6B3D', '#C9F73F', '#6BB7FF', '#FF4D8F', '#B07AFF', '#FFD93D', '#5EE2A8']
+        },
         actionLinks: {
             google: { label: 'GMAPS', urlTemplate: 'https://www.google.com/maps/dir/?api=1&destination={{lat}},{{lon}}' },
             apple: { label: 'iOS', urlTemplate: 'https://maps.apple.com/?daddr={{lat}},{{lon}}' },
             mapsme: { label: 'Maps.me', urlTemplate: 'mapsme://map?ll={{lat}},{{lon}}', mobileOnly: true }
         },
+        // Categories drive the chip filter and the bottom-sheet meta row in skins
+        // that have those UI components (e.g. innsight2026). Each entry: id matches
+        // poi.cat (or poi.type if no cat); label is shown in chips; color is the
+        // category dot. The "all" entry is implicit and rendered by the skin.
+        categories: [],
         pois: [],
         paths: [],
         filters: { types: [], soloMode: true },
@@ -47,14 +62,27 @@
         }
         return {
             id: poi.id || ('poi-' + idx),
-            title: poi.title || '',
+            title: poi.title || poi.name || '',
+            // `name` is the design's preferred field; expose both so skin templates
+            // can reach it without aliasing.
+            name: poi.name || poi.title || '',
             lat: lat,
             lon: lon,
             description: poi.description != null ? poi.description : (poi.desc || ''),
-            type: poi.type || 'place',
+            // `cat` is the design's category id (eats|drinks|sights|shops|events).
+            // Some data sources use `type` instead — normalize both into both fields.
+            type: poi.type || poi.cat || 'place',
+            cat: poi.cat || poi.type || 'place',
             category: poi.category || '',
             icon: poi.icon || '',
             image: poi.image || poi.img || '',
+            // Flat fields the design's bottom-sheet template references.
+            rating: poi.rating != null ? Number(poi.rating) : null,
+            dist: poi.dist || '',
+            open: poi.open !== undefined ? !!poi.open : true,
+            hours: poi.hours || '',
+            tag: poi.tag || '',
+            blurb: poi.blurb || poi.description || '',
             button: { url: btn.url || '', text: btn.text || '' },
             pinned: !!poi.pinned,
             googlePlaceId: poi.googlePlaceId || poi.google_place_id || ''
@@ -105,12 +133,15 @@
         }
 
         // Validate provider type
-        var ok = ['osm', 'mapbox', 'google'];
+        var ok = ['osm', 'mapbox', 'mapbox-gl', 'google'];
         if (ok.indexOf(cfg.provider.type) === -1) {
             throw new Error('[innsight] unknown provider.type: ' + cfg.provider.type);
         }
         if (cfg.provider.type === 'mapbox' && !cfg.provider.mapbox.accessToken) {
             throw new Error('[innsight] mapbox provider requires provider.mapbox.accessToken');
+        }
+        if (cfg.provider.type === 'mapbox-gl' && !cfg.provider['mapbox-gl'].accessToken && !cfg.provider['mapbox-gl'].style) {
+            throw new Error('[innsight] mapbox-gl provider requires provider["mapbox-gl"].accessToken (and a style URL or inline style JSON)');
         }
 
         return cfg;

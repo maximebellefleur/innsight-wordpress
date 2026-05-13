@@ -1,0 +1,110 @@
+<div class="in-app" data-innsight-fullscreen-target>
+    <!-- Map: full-bleed, behind everything. The engine mounts the map provider here. -->
+    <div class="in-map-stage">
+        <div class="in-map" data-innsight-map></div>
+        <div class="in-paper-grain" aria-hidden="true"></div>
+
+        <!-- Floating "spots nearby" badge (top-left, under chrome) -->
+        <div class="in-nearby" data-innsight-nearby>
+            <span class="in-nearby__dot" aria-hidden="true"></span>
+            <span class="in-nearby__count" data-innsight-count>0</span>
+            <span class="in-nearby__label">spots nearby</span>
+        </div>
+
+        <!-- Vertical map controls: fullscreen + zoom in + zoom out -->
+        <div class="in-mapctl" data-innsight-controls>
+            <button class="in-mapctl__btn in-mapctl__btn--first" data-innsight-fullscreen aria-label="Toggle fullscreen">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M1 6V1h5M15 6V1h-5M1 10v5h5M15 10v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <button class="in-mapctl__btn" data-innsight-zoom-in aria-label="Zoom in">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <button class="in-mapctl__btn in-mapctl__btn--last" data-innsight-zoom-out aria-label="Zoom out">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Fullscreen wordmark pill (only visible in fullscreen mode) -->
+        <div class="in-wordmark-pill" data-innsight-wordmark-pill>
+            <span>Innsight</span><span class="in-accent-dot">.</span>
+        </div>
+    </div>
+
+    <!-- Top chrome: wordmark + profile + search + chips -->
+    <header class="in-chrome" data-innsight-chrome>
+        <div class="in-chrome__row">
+            <div class="in-wordmark">Innsight<span class="in-accent-dot">.</span></div>
+            <div class="in-spacer"></div>
+            <button class="in-profile" aria-label="Profile">m</button>
+        </div>
+
+        <div class="in-chrome__search">
+            <div class="in-search">
+                <svg class="in-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+                <input type="search" class="in-search__input" data-innsight-search
+                       placeholder="Spots, vibes, neighborhoods…" autocomplete="off" />
+                <span class="in-search__badge" data-innsight-count>0</span>
+            </div>
+        </div>
+
+        <div class="in-chips" data-innsight-chips role="tablist" aria-label="Category filter"></div>
+    </header>
+
+    <!-- List view container: shown only when route=list. The skin renders it. -->
+    <section class="in-list" data-innsight-list-view aria-hidden="true">
+        <div class="in-list__head">
+            <div class="in-list__row">
+                <div class="in-wordmark">Innsight<span class="in-accent-dot">.</span></div>
+                <div class="in-spacer"></div>
+                <button class="in-profile" aria-label="Profile">m</button>
+            </div>
+            <div class="in-list__title">
+                <div class="in-list__pretitle">Inside, right now</div>
+                <h1 class="in-list__h1"><span data-innsight-list-count>0</span> spots <em>nearby</em></h1>
+            </div>
+            <div class="in-list__search">
+                <div class="in-search">
+                    <svg class="in-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.8"/>
+                        <path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                    <input type="search" class="in-search__input" data-innsight-list-search placeholder="Search the list…" autocomplete="off" />
+                </div>
+            </div>
+            <div class="in-chips in-chips--small" data-innsight-list-chips role="tablist" aria-label="Category filter"></div>
+            <div class="in-list__sort">
+                <span class="in-list__sortlabel">SORTED BY</span>
+                <span class="in-list__sortvalue">Nearest first</span>
+                <span class="in-spacer"></span>
+                <span class="in-list__count" data-innsight-list-results>0 results</span>
+            </div>
+        </div>
+        <div class="in-list__rows" data-innsight-list></div>
+    </section>
+
+    <!-- Saved / You empty-state container (skin renders into this) -->
+    <section class="in-screen-empty" data-innsight-empty aria-hidden="true"></section>
+
+    <!-- POI bottom sheet -->
+    <div class="in-sheet-backdrop" data-innsight-sheet-backdrop></div>
+    <div class="in-sheet" data-innsight-sheet aria-hidden="true">
+        <div class="in-sheet__inner" data-innsight-sheet-inner></div>
+    </div>
+
+    <!-- Tab bar (Map / List / Saved / You) -->
+    <nav class="in-tabs" data-innsight-tabs role="tablist" aria-label="Sections">
+        <button class="in-tab" data-route="map" role="tab">Map<span class="in-tab__underline"></span></button>
+        <button class="in-tab" data-route="list" role="tab">List<span class="in-tab__underline"></span></button>
+        <button class="in-tab" data-route="save" role="tab">Saved<span class="in-tab__underline"></span></button>
+        <button class="in-tab" data-route="me" role="tab">You<span class="in-tab__underline"></span></button>
+    </nav>
+</div>

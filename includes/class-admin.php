@@ -49,6 +49,7 @@ final class Admin {
 
         add_settings_section( 'innsight_engine', __( 'Engine source', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_provider', __( 'Map provider', 'innsight' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'innsight_design', __( 'Design', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_enrichment', __( 'Google Places enrichment', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_render', __( 'Render mode & UI', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_geocoder', __( 'Geocoder', 'innsight' ), '__return_false', self::PAGE_SLUG );
@@ -56,7 +57,9 @@ final class Admin {
         $this->add_field( 'engine_source', __( 'Engine source', 'innsight' ), 'innsight_engine', 'render_engine_source' );
         $this->add_field( 'engine_url', __( 'Custom engine base URL', 'innsight' ), 'innsight_engine', 'render_text', __( 'Required only when "Custom" is selected. The URL must serve the engine directory tree (e.g. /engine/innsight.js).', 'innsight' ) );
         $this->add_field( 'skin_url', __( 'Custom skin base URL', 'innsight' ), 'innsight_engine', 'render_text', __( 'Optional override - if empty, the bundled skin is used.', 'innsight' ) );
-        $this->add_field( 'skin_name', __( 'Skin name', 'innsight' ), 'innsight_engine', 'render_text' );
+
+        $this->add_field( 'skin_name', __( 'Design', 'innsight' ), 'innsight_design', 'render_skin_radio',
+            __( 'Choose which skin renders the map. The new 2026 design needs a Mapbox access token (see below).', 'innsight' ) );
 
         $this->add_field( 'provider_default', __( 'Default provider', 'innsight' ), 'innsight_provider', 'render_provider_default' );
         $this->add_field( 'mapbox_access_token', __( 'Mapbox access token', 'innsight' ), 'innsight_provider', 'render_text' );
@@ -116,6 +119,32 @@ final class Admin {
             echo '<option value="' . esc_attr( $k ) . '" ' . selected( $value, $k, false ) . '>' . esc_html( $label ) . '</option>';
         }
         echo '</select>';
+    }
+
+    public function render_skin_radio( string $key, $value ): void {
+        $value = (string) $value !== '' ? (string) $value : 'solike2025';
+        $opts = array(
+            'solike2025'  => array(
+                'label' => __( 'Legacy (solike2025)', 'innsight' ),
+                'desc'  => __( 'Cluster + popup card. Matches the look the yuna-innsight plugin shipped. No Mapbox token required.', 'innsight' ),
+            ),
+            'innsight2026' => array(
+                'label' => __( 'New 2026 design (innsight2026)', 'innsight' ),
+                'desc'  => __( 'Cream / sticker pins / bottom sheet / list / tab bar. Requires a Mapbox access token (free tier covers 50k loads/month).', 'innsight' ),
+            ),
+        );
+        echo '<fieldset>';
+        foreach ( $opts as $id => $spec ) {
+            printf(
+                '<label style="display:block;margin-bottom:8px"><input type="radio" name="%s" value="%s" %s /> <strong>%s</strong> &mdash; <span class="description">%s</span></label>',
+                esc_attr( self::OPTION_NAME . '[' . $key . ']' ),
+                esc_attr( $id ),
+                checked( $value, $id, false ),
+                esc_html( $spec['label'] ),
+                esc_html( $spec['desc'] )
+            );
+        }
+        echo '</fieldset>';
     }
 
     public function render_provider_default( string $key, $value ): void {

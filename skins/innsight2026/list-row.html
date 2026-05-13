@@ -1,0 +1,22 @@
+<button class="in-row" data-innsight-list-row data-poi-id="{{id}}" style="--c: {{stickerColor}}; --i: {{__index}}">
+    <div class="in-row__sticker">
+        {{#if image}}<img class="in-row__img" src="{{image}}" alt="" loading="lazy">{{/if}}
+        <div class="in-row__wash" aria-hidden="true"></div>
+        <div class="in-row__initial" aria-hidden="true">{{initial}}</div>
+    </div>
+    <div class="in-row__body">
+        <div class="in-row__head">
+            <span class="in-row__name">{{title}}</span>
+            <span class="in-row__dist">{{dist}}</span>
+        </div>
+        {{#if tag}}<div class="in-row__tag">{{tag}}</div>{{/if}}
+        <div class="in-row__meta">
+            <span class="in-row__catdot" style="background:{{categoryColor}}"></span>
+            <span class="in-row__catlabel">{{categoryLabel}}</span>
+            <span class="in-row__sep">·</span>
+            <span class="in-row__open" data-open="{{open}}">{{openShort}}</span>
+            <span class="in-spacer"></span>
+            {{#if rating}}<span class="in-row__rating">★ {{rating}}</span>{{/if}}
+        </div>
+    </div>
+</button>

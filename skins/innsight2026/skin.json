@@ -1,0 +1,19 @@
+{
+    "name": "innsight2026",
+    "version": "1.0.0",
+    "description": "Innsight cream/sticker skin (2026 revamp). Maps with Mapbox GL JS + custom cream style + bottom-sheet UX. Mobile-first, premium 'in-the-know' aesthetic.",
+    "files": {
+        "layout":     "layout.html",
+        "pin":        "pin.html",
+        "sheet":      "sheet.html",
+        "listRow":    "list-row.html",
+        "emptyState": "empty-state.html",
+        "css":        "skin.css",
+        "js":         "skin.js"
+    },
+    "externalCss": [
+        "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Instrument+Serif:ital@0;1&display=swap",
+        "https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css"
+    ],
+    "mapboxStyle": "mapbox-style.json"
+}

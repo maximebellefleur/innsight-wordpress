@@ -1,0 +1,52 @@
+<div class="in-grabber" data-innsight-sheet-close></div>
+
+{{#if counter}}
+<div class="in-sheet__nav">
+    <button class="in-sheet__navbtn in-sheet__navbtn--prev" data-innsight-sheet-prev aria-label="Previous spot">
+        <span class="in-sheet__chev" aria-hidden="true">‹</span>
+        <span class="in-sheet__navname">{{prevName}}</span>
+    </button>
+    <span class="in-sheet__counter">{{counter}}</span>
+    <button class="in-sheet__navbtn in-sheet__navbtn--next" data-innsight-sheet-next aria-label="Next spot">
+        <span class="in-sheet__navname">{{nextName}}</span>
+        <span class="in-sheet__chev" aria-hidden="true">›</span>
+    </button>
+</div>
+{{/if}}
+
+<div class="in-hero" style="--c: {{stickerColor}}">
+    {{#if image}}<img class="in-hero__img" src="{{image}}" alt="" loading="lazy">{{/if}}
+    <div class="in-hero__wash" aria-hidden="true"></div>
+    <div class="in-hero__shine" aria-hidden="true"></div>
+    <div class="in-hero__initial" aria-hidden="true">{{initial_lc}}</div>
+    {{#if firstTag}}<div class="in-hero__tagpill">{{firstTag}}</div>{{/if}}
+</div>
+
+<div class="in-sheet__meta">
+    <span class="in-sheet__catdot" style="background:{{categoryColor}}"></span>
+    <span class="in-sheet__catlabel">{{categoryLabel}}</span>
+    <span class="in-sheet__sep">·</span>
+    <span class="in-sheet__dist">{{dist}}</span>
+    {{#if hours}}<span class="in-sheet__sep">·</span>
+    <span class="in-sheet__open" data-open="{{open}}">{{openLabel}}</span>{{/if}}
+</div>
+
+<h2 class="in-sheet__title">{{title}}</h2>
+
+{{#if hours}}<div class="in-sheet__hours">{{hours}}</div>{{/if}}
+
+{{#if blurb}}<p class="in-sheet__blurb">{{blurb}}</p>{{/if}}
+
+{{#if vibeTags}}
+<div class="in-sheet__vibelabel">The vibe</div>
+<div class="in-sheet__vibewrap">
+    {{#each vibeTags}}<span class="in-sheet__tag">{{value}}</span>{{/each}}
+    {{#if rating}}<span class="in-sheet__tag">★ {{rating}}</span>{{/if}}
+</div>
+{{/if}}
+
+<div class="in-sheet__actions">
+    <button class="in-sheet__act" data-innsight-sheet-save>Save</button>
+    {{#if button.url}}<a class="in-sheet__act in-sheet__act--primary" href="{{button.url}}" target="_blank" rel="noopener">{{button.text}}</a>{{/if}}
+    {{#unless button.url}}<button class="in-sheet__act in-sheet__act--primary" data-innsight-sheet-directions>Directions</button>{{/unless}}
+</div>

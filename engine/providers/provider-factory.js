@@ -11,6 +11,8 @@
                 return new Innsight._LeafletProvider(targetEl, opts);
             case 'mapbox':
                 return new Innsight._MapboxProvider(targetEl, opts);
+            case 'mapbox-gl':
+                return new Innsight._MapboxGLProvider(targetEl, opts);
             case 'google':
                 return new Innsight._GoogleProvider(targetEl, opts);
             default:

@@ -41,7 +41,8 @@ final class SkinPartials {
         }
 
         $signature = (string) filemtime( $manifest_path );
-        foreach ( array( 'layout.html', 'popup.html', 'cluster.html', 'list-item.html', 'skin.css' ) as $f ) {
+        $watched = array( 'layout.html', 'popup.html', 'cluster.html', 'pin.html', 'sheet.html', 'list-row.html', 'list-item.html', 'empty-state.html', 'skin.css', 'skin.js' );
+        foreach ( $watched as $f ) {
             if ( is_readable( $base . $f ) ) {
                 $signature .= '|' . filemtime( $base . $f );
             }
@@ -59,10 +60,14 @@ final class SkinPartials {
         }
         $files    = $manifest['files'];
         $partials = array(
-            'layout'   => $this->slurp( $base, $files['layout'] ?? null ),
-            'popup'    => $this->slurp( $base, $files['popup'] ?? null ),
-            'cluster'  => $this->slurp( $base, $files['cluster'] ?? null ),
-            'listItem' => $this->slurp( $base, $files['listItem'] ?? null ),
+            'layout'     => $this->slurp( $base, $files['layout']     ?? null ),
+            'popup'      => $this->slurp( $base, $files['popup']      ?? null ),
+            'cluster'    => $this->slurp( $base, $files['cluster']    ?? null ),
+            'pin'        => $this->slurp( $base, $files['pin']        ?? null ),
+            'sheet'      => $this->slurp( $base, $files['sheet']      ?? null ),
+            'listRow'    => $this->slurp( $base, $files['listRow']    ?? null ),
+            'listItem'   => $this->slurp( $base, $files['listItem']   ?? null ),
+            'emptyState' => $this->slurp( $base, $files['emptyState'] ?? null ),
         );
 
         set_transient( $cache_key, $partials, HOUR_IN_SECONDS * 12 );
