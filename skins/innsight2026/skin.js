@@ -1043,11 +1043,46 @@
 
         // Wire taps -> open the sheet. Look up the live POI by id; if it
         // no longer exists, synthesize a minimal POI from the saved entry
-        // so the sheet still opens.
+        // so the sheet still opens. Also inject an X "remove" affordance
+        // per row so the user can unsave directly without opening the
+        // sheet first.
         var rows = host.querySelectorAll('[data-innsight-list-row]');
         for (var i = 0; i < rows.length; i++) {
             (function (row) {
-                row.addEventListener('click', function () {
+                // Append X. Use a <span role="button"> not <button> to
+                // avoid invalid nested-button HTML (the row itself is a
+                // <button>). stopPropagation prevents the row click from
+                // also firing.
+                var x = document.createElement('span');
+                x.className = 'in-row__remove';
+                x.setAttribute('role', 'button');
+                x.setAttribute('tabindex', '-1');
+                x.setAttribute('aria-label', 'Remove from saved');
+                x.textContent = '×';
+                var unsave = function (e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    var id = row.getAttribute('data-poi-id');
+                    var live = (self.cfg.pois || []).find(function (p) { return String(p.id) === id; });
+                    var entry = self.readSaved()[id];
+                    var poi = live || (entry ? {
+                        id: entry.id, title: entry.title,
+                        cat: entry.cat, type: entry.type,
+                        lat: entry.lat, lon: entry.lon
+                    } : { id: id });
+                    // toggleSavedPoi will detect the entry is currently
+                    // saved (it is) and remove it. Our re-render call
+                    // inside toggleSavedPoi (route==='save' branch) then
+                    // refreshes the list without this row.
+                    self.toggleSavedPoi(poi);
+                };
+                x.addEventListener('click', unsave);
+                row.appendChild(x);
+
+                row.addEventListener('click', function (e) {
+                    // Skip if the click was actually on the X (already
+                    // handled, but extra safety).
+                    if (e.target === x || x.contains(e.target)) return;
                     var id = row.getAttribute('data-poi-id');
                     var live = (self.cfg.pois || []).find(function (p) { return String(p.id) === id; });
                     if (live) { self.openSheet(live); return; }

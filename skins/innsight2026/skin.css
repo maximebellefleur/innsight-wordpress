@@ -1003,20 +1003,36 @@ body.innsight-sheet-locked {
 .in-saved__rows .in-list__empty { padding: 60px 12px; text-align: center; color: var(--in-mute);
     font-family: var(--in-font-display); font-style: italic; font-size: 22px; }
 
-/* Inline "Remove" affordance on each saved row - tap the heart-cross icon
- * to unsave without opening the sheet. */
+/* Inline "Remove from saved" X affordance on each saved row. Span (not
+ * button) to avoid nested-button HTML; positioned absolutely on the
+ * right edge of the row. */
+.in-saved .in-row { position: relative; padding-right: 44px; }
 .in-row__remove {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: transparent;
     border: 0;
     color: var(--in-mute2);
-    font-size: 18px;
+    font-size: 22px;
     line-height: 1;
-    padding: 6px 8px;
     cursor: pointer;
     border-radius: 50%;
-    transition: color 160ms, background 160ms;
+    transition: color 160ms, background 160ms, transform 160ms;
+    user-select: none;
 }
-.in-row__remove:hover { color: var(--in-closed); background: rgba(180, 59, 59, 0.08); }
+.in-row__remove:hover {
+    color: var(--in-closed);
+    background: rgba(180, 59, 59, 0.10);
+    transform: translateY(-50%) scale(1.08);
+}
+.in-row__remove:active { transform: translateY(-50%) scale(0.92); }
 
 /* Google Maps "View on" link below the sheet actions. Subtle, not a button. */
 .in-sheet__gmaps {

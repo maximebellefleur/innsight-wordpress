@@ -1,4 +1,14 @@
 # Changelog
+## 0.4.11 - 2026-05-12
+
+- **X "remove from saved" affordance on every saved row.** Tap the X on
+  the right edge to unsave without opening the sheet. Wired through
+  `toggleSavedPoi` so the row disappears immediately (re-render fires
+  because we're on route='save'). The X is a `<span role="button">`
+  to avoid invalid nested-button HTML (the row itself is a button); a
+  `stopPropagation` on its click handler keeps the row tap from also
+  firing, so tapping the X never opens the sheet.
+
 ## 0.4.10 - 2026-05-12
 
 - **Sheet button text truncates with ellipsis** when too long. The ACF
