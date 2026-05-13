@@ -1,4 +1,13 @@
 # Changelog
+## 0.4.10 - 2026-05-12
+
+- **Sheet button text truncates with ellipsis** when too long. The ACF
+  `poi_url_link` title (e.g. "The most beautiful lakes around
+  Interlaken") used to wrap onto two lines and overlap the Save button.
+  `.in-sheet__act` now renders single-line, centered, with
+  `text-overflow: ellipsis` so any custom button text gets clipped to
+  a clean "...".
+
 
 ## 0.4.9 - 2026-05-12
 

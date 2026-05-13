@@ -563,15 +563,28 @@
 }
 .in-sheet__act {
     flex: 1;
+    /* min-width:0 lets the flex item shrink past its content size, which
+     * is what enables text-overflow:ellipsis to actually clip a long
+     * button label instead of forcing the row taller / wider. */
+    min-width: 0;
     height: 48px;
+    line-height: 48px;
     border-radius: 14px;
     background: transparent;
     color: var(--in-ink);
     border: 1.5px solid var(--in-ink);
     font-weight: 600; font-size: 15px;
     cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
+    /* Single-line, centered, ellipsis when the custom button text is
+     * too long (e.g. "The most beautiful lakes around Interlaken"). */
+    display: block;
+    text-align: center;
+    padding: 0 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-decoration: none;
+    box-sizing: border-box;
 }
 .in-sheet__act--primary,
 .in-sheet__act--primary:visited,
