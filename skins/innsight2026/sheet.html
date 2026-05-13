@@ -41,7 +41,7 @@
 <div class="in-sheet__vibelabel">The vibe</div>
 <div class="in-sheet__vibewrap">
     {{#each vibeTags}}<span class="in-sheet__tag">{{value}}</span>{{/each}}
-    {{#if rating}}<span class="in-sheet__tag">★ {{rating}}</span>{{/if}}
+    {{#if ratingLabel}}<span class="in-sheet__tag in-sheet__tag--rating">★ {{ratingLabel}}</span>{{/if}}
 </div>
 {{/if}}
 
@@ -50,3 +50,7 @@
     {{#if button.url}}<a class="in-sheet__act in-sheet__act--primary" href="{{button.url}}" target="_blank" rel="noopener">{{button.text}}</a>{{/if}}
     {{#unless button.url}}<button class="in-sheet__act in-sheet__act--primary" data-innsight-sheet-directions>Directions</button>{{/unless}}
 </div>
+
+{{#if googleMapsUri}}
+<a class="in-sheet__gmaps" href="{{googleMapsUri}}" target="_blank" rel="noopener">View on Google Maps →</a>
+{{/if}}

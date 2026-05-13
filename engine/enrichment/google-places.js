@@ -1,123 +1,184 @@
-/* Innsight - opt-in Google Places enrichment.
+/* Innsight - on-demand Google Places enrichment.
  *
- * Activates when:
- *   - config.enrichment.google.apiKey is set
- *   - the POI has a googlePlaceId (or matches by name+lat/lon at runtime)
+ * The user opens a POI's bottom sheet -> the skin calls
+ * `instance.enrichPoi(poi)` -> we look up the Place ID (search by text +
+ * location bias when the POI doesn't already carry one), fetch the Place
+ * Details, cache the response in localStorage, and resolve with the merged
+ * data.
  *
- * For each POI missing one or more configured `fields`, calls the Place Details endpoint
- * via Google's recommended "Places API (New)" v1 fetch shape, fills the gaps in-memory,
- * and re-renders the popup HTML on next open. Caches responses in localStorage.
+ * Cost / privacy tradeoffs are explicit:
+ *   - Only POIs the user actually opens get queried (no bulk init enrich).
+ *   - localStorage cache TTL defaults to 30 days; place facts move slowly.
+ *   - A negative result is cached too (shorter TTL) so we don't re-pay the
+ *     search cost for POIs Google can't match.
+ *   - The API key is sent from the browser; restrict it to your HTTP
+ *     referrer in the Google Cloud Console before enabling enrichment.
  *
- * Falls back silently on failure - JSON-supplied fields are always the source of truth.
+ * Returns a single shape regardless of source:
+ *   { placeId, rating, userRatingCount, openNow, todaysHours,
+ *     weekdayHours[7], googleMapsUri, websiteUri, phone, photoUrl,
+ *     reviews[<=5] }
+ * Returns null when disabled / not found / on error.
  */
 (function (root) {
     'use strict';
 
     var Innsight = root.Innsight = root.Innsight || {};
     var CACHE_PREFIX = 'innsight:gp:';
+    var NEG_TTL_HOURS = 24 * 7;   // a week is enough for a re-try
+    var POS_TTL_HOURS = 24 * 30;  // a month for found places
 
-    function readCache(placeId, ttlHours) {
+    function cacheKey(poi) {
+        if (poi.googlePlaceId) return CACHE_PREFIX + poi.googlePlaceId;
+        return CACHE_PREFIX + 'id:' + String(poi.id || (poi.lat + ',' + poi.lon));
+    }
+
+    function readCache(key) {
         try {
-            var raw = root.localStorage && root.localStorage.getItem(CACHE_PREFIX + placeId);
+            var raw = root.localStorage && root.localStorage.getItem(key);
             if (!raw) return null;
             var entry = JSON.parse(raw);
             if (!entry || !entry.savedAt) return null;
-            var ageMs = Date.now() - entry.savedAt;
-            if (ageMs > (ttlHours || 24) * 3600 * 1000) return null;
-            return entry.data;
+            var ttlMs = (entry.notFound ? NEG_TTL_HOURS : POS_TTL_HOURS) * 3600 * 1000;
+            if (Date.now() - entry.savedAt > ttlMs) return null;
+            return entry;
         } catch (e) { return null; }
     }
 
-    function writeCache(placeId, data) {
+    function writeCache(key, payload) {
         try {
-            root.localStorage && root.localStorage.setItem(CACHE_PREFIX + placeId, JSON.stringify({ savedAt: Date.now(), data: data }));
+            root.localStorage && root.localStorage.setItem(key, JSON.stringify({
+                savedAt: Date.now(),
+                notFound: !!payload.notFound,
+                data: payload.data || null
+            }));
         } catch (e) {}
     }
 
-    function fetchDetails(placeId, apiKey, fields) {
+    /* Resolve Place ID from a free-text query, biased by the POI's lat/lon. */
+    function searchPlaceId(poi, apiKey) {
+        var query = (poi.title || poi.name || '') + (poi.cat || poi.type ? ' ' + (poi.cat || poi.type) : '');
+        var bias = {
+            circle: {
+                center: { latitude: Number(poi.lat), longitude: Number(poi.lon) },
+                radius: 500   // metres - tight enough to avoid wrong-city collisions
+            }
+        };
+        return fetch('https://places.googleapis.com/v1/places:searchText', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'places.id,places.displayName,places.location'
+            },
+            body: JSON.stringify({ textQuery: query, locationBias: bias, maxResultCount: 1 })
+        }).then(function (r) {
+            if (!r.ok) throw new Error('places:searchText ' + r.status);
+            return r.json();
+        }).then(function (res) {
+            if (res.places && res.places.length) return res.places[0].id;
+            return null;
+        });
+    }
+
+    /* Fetch Place Details for an id. Fields = display + ops + 3 reviews. */
+    function fetchDetails(placeId, apiKey) {
         var url = 'https://places.googleapis.com/v1/places/' + encodeURIComponent(placeId);
-        var fieldMask = (fields && fields.length ? fields : ['photos', 'opening_hours', 'rating'])
-            .map(function (f) {
-                if (f === 'photos') return 'photos';
-                if (f === 'opening_hours') return 'currentOpeningHours,regularOpeningHours';
-                if (f === 'rating') return 'rating,userRatingCount';
-                return f;
-            }).join(',');
+        var fieldMask = [
+            'id', 'displayName',
+            'rating', 'userRatingCount',
+            'currentOpeningHours', 'regularOpeningHours',
+            'photos',
+            'googleMapsUri', 'websiteUri',
+            'nationalPhoneNumber',
+            'reviews'
+        ].join(',');
         return fetch(url, {
             method: 'GET',
-            headers: {
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': fieldMask
-            }
+            headers: { 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': fieldMask }
         }).then(function (r) {
-            if (!r.ok) throw new Error('places API ' + r.status);
+            if (!r.ok) throw new Error('places.details ' + r.status);
             return r.json();
         });
     }
 
-    function poiMissingFields(poi, fields) {
-        var missing = [];
-        if (!fields || !fields.length) return missing;
-        fields.forEach(function (f) {
-            if (f === 'photos' && !poi.image) missing.push('photos');
-            if (f === 'opening_hours' && !poi.openingHours) missing.push('opening_hours');
-            if (f === 'rating' && poi.rating == null) missing.push('rating');
-        });
-        return missing;
+    /* Reshape the raw Places response into the flat shape skin templates
+     * expect. Stable keys, missing values become null/empty. */
+    function shape(details, apiKey) {
+        if (!details) return null;
+        var open = details.currentOpeningHours || details.regularOpeningHours || null;
+        var weekday = open && open.weekdayDescriptions ? open.weekdayDescriptions : [];
+        // weekdayDescriptions are Sunday-first in some Places responses,
+        // Monday-first in others depending on locale. We just expose all 7.
+        var d = new Date();
+        var todayIdx = d.getDay(); // 0 = Sun
+        var todays = weekday[todayIdx] ? weekday[todayIdx].split(': ').slice(1).join(': ') : '';
+        var photoUrl = '';
+        if (details.photos && details.photos.length && apiKey) {
+            // The /v1/{name}/media endpoint returns a redirect to the actual
+            // image bytes. Including the key works because the key is
+            // referrer-restricted (admin's responsibility).
+            photoUrl = 'https://places.googleapis.com/v1/' + details.photos[0].name + '/media?maxHeightPx=720&key=' + encodeURIComponent(apiKey);
+        }
+        return {
+            placeId:         details.id || '',
+            rating:          details.rating != null ? Number(details.rating) : null,
+            userRatingCount: details.userRatingCount != null ? Number(details.userRatingCount) : null,
+            openNow:         open ? !!open.openNow : null,
+            todaysHours:     todays || '',
+            weekdayHours:    weekday,
+            googleMapsUri:   details.googleMapsUri || '',
+            websiteUri:      details.websiteUri || '',
+            phone:           details.nationalPhoneNumber || '',
+            photoUrl:        photoUrl,
+            reviews:         Array.isArray(details.reviews) ? details.reviews.slice(0, 3).map(function (r) {
+                return {
+                    author: (r.authorAttribution && r.authorAttribution.displayName) || '',
+                    rating: r.rating || null,
+                    text:   (r.text && r.text.text) || '',
+                    when:   r.relativePublishTimeDescription || ''
+                };
+            }) : []
+        };
     }
 
-    function applyDetails(poi, details) {
-        if (!details) return false;
-        var changed = false;
-        if (!poi.image && details.photos && details.photos.length) {
-            // Construct a photo URL using the photo resource name.
-            poi.image = 'https://places.googleapis.com/v1/' + details.photos[0].name + '/media?maxHeightPx=400';
-            changed = true;
+    /**
+     * Public: enrich a single POI. Resolves with the shape() result or null.
+     * Honours config.enrichment.google.apiKey + cacheTtlHours from the v1
+     * JSON. Safe to call repeatedly for the same POI - the cache short-
+     * circuits.
+     */
+    function enrichPoi(poi, config) {
+        var conf = config && config.enrichment && config.enrichment.google;
+        if (!conf || !conf.apiKey || !poi) return Promise.resolve(null);
+        var key = cacheKey(poi);
+        var cached = readCache(key);
+        if (cached) {
+            return Promise.resolve(cached.notFound ? null : cached.data);
         }
-        if (!poi.openingHours && (details.regularOpeningHours || details.currentOpeningHours)) {
-            poi.openingHours = (details.currentOpeningHours || details.regularOpeningHours).weekdayDescriptions || [];
-            changed = true;
-        }
-        if (poi.rating == null && details.rating != null) {
-            poi.rating = details.rating;
-            poi.userRatingCount = details.userRatingCount;
-            changed = true;
-        }
-        return changed;
-    }
 
-    function enrich(state) {
-        var conf = state.normalized.enrichment && state.normalized.enrichment.google;
-        if (!conf || !conf.apiKey) return Promise.resolve();
-        var fields = conf.fields || [];
-        var ttl = conf.cacheTtlHours || 24;
-        var jobs = [];
+        var placeIdPromise = poi.googlePlaceId
+            ? Promise.resolve(poi.googlePlaceId)
+            : searchPlaceId(poi, conf.apiKey);
 
-        state.normalized.pois.forEach(function (poi) {
-            if (!poi.googlePlaceId) return;
-            var missing = poiMissingFields(poi, fields);
-            if (!missing.length) return;
-            var cached = readCache(poi.googlePlaceId, ttl);
-            if (cached) {
-                if (applyDetails(poi, cached)) {
-                    Innsight._markers.rebuildPopup(state, poi);
-                    state.events.emit('enrichment:applied', { poi: poi, source: 'cache' });
-                }
-                return;
+        return placeIdPromise.then(function (placeId) {
+            if (!placeId) {
+                writeCache(key, { notFound: true });
+                return null;
             }
-            jobs.push(fetchDetails(poi.googlePlaceId, conf.apiKey, missing).then(function (details) {
-                writeCache(poi.googlePlaceId, details);
-                if (applyDetails(poi, details)) {
-                    Innsight._markers.rebuildPopup(state, poi);
-                    state.events.emit('enrichment:applied', { poi: poi, source: 'remote' });
-                }
-            }).catch(function (err) {
-                if (root.console) root.console.warn('[innsight] places enrichment failed for ' + poi.id + ':', err.message);
-            }));
+            return fetchDetails(placeId, conf.apiKey).then(function (details) {
+                var data = shape(details, conf.apiKey);
+                writeCache(key, { data: data });
+                return data;
+            });
+        }).catch(function (err) {
+            if (root.console) root.console.warn('[innsight] places enrichment for ' + (poi.id || '?') + ':', err && err.message);
+            // Negative-cache transient failures briefly so we don't re-pay
+            // for a flaky network on every sheet open.
+            writeCache(key, { notFound: true });
+            return null;
         });
-
-        return Promise.all(jobs);
     }
 
-    Innsight._enrichment = { enrich: enrich };
+    Innsight._enrichment = { enrichPoi: enrichPoi };
 })(typeof window !== 'undefined' ? window : this);

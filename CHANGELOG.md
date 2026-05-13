@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.4.7 - 2026-05-12
+
+Google Places enrichment, on-demand only.
+
+- **Refactored from "enrich every POI at init" to "enrich one POI when its
+  sheet opens".** The previous pass walked the entire POI list during
+  bootstrap; if the user opened just one card we were paying for dozens of
+  Place Details requests. Now the engine exposes a single
+  `instance.enrichPoi(poi)` API which the skin calls from `openSheet(poi)`.
+- **Resolves Place ID by text + location when the POI doesn't have one.**
+  Legacy yuna terms never carried `googlePlaceId`. The enrichment now
+  calls `places:searchText` first (biased to a 500m circle around the
+  POI), takes the top match, then fetches Place Details. POIs that
+  already have a `googlePlaceId` skip the search and go straight to
+  Details.
+- **Two-tier localStorage cache.** Found places get a 30-day TTL, "not
+  found" gets a 7-day TTL so transient Google failures or genuinely-
+  unmatchable POIs don't re-pay the search cost on every sheet open.
+  Cache key uses the placeId when known, else the POI's stable id.
+- **Sheet surfaces the new fields:**
+  - Rating chip becomes "★ 4.5 (123)" once the review count lands
+    (count is compact-formatted: 1.2k / 12k).
+  - `openNow` from `currentOpeningHours` flips the green/red status.
+  - `todaysHours` populates the hours line below the title.
+  - `googleMapsUri` becomes a subtle "View on Google Maps →" link below
+    the action buttons.
+  - `photoUrl` fills `poi.image` when the POI had no photo.
+  - `websiteUri` fills the primary button URL when missing.
+- **Field mask is tight** - only `id, displayName, rating,
+  userRatingCount, currentOpeningHours, regularOpeningHours, photos,
+  googleMapsUri, websiteUri, nationalPhoneNumber, reviews` are requested.
+  Reviews are sliced to 3.
+
+Setup:
+1. Get a Google Cloud Places API key, restrict it to your HTTP referrer.
+2. Settings -> Innsight -> Google Places enrichment -> tick "Enable" +
+   paste the key. Save.
+3. Open any POI on the front-end. Within ~300ms you'll see the rating /
+   review-count / hours / Maps link populate. Subsequent opens read from
+   localStorage instantly.
+
+Cost shape (Places API v1, May 2026): searchText ~$0.017/req +
+places.details ~$0.005/req = ~$0.022 per unique POI per 30 days per
+visitor browser.
+
 ## 0.4.6 - 2026-05-12
 
 Five things in one batch.

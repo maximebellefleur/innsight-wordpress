@@ -41,6 +41,17 @@
             filter: function (opts) { Innsight._filtering.setFilter(state, opts); return instance; },
             exportKml: function (filename) { return Innsight._kmlExport.download(state, filename); },
             getKml: function () { return Innsight._kmlExport.buildKml(state); },
+            // Fetch Google Places enrichment for a single POI. Used by the
+            // skin when the user opens the bottom sheet - on-demand, cached
+            // in localStorage. Resolves with the shaped Places payload or
+            // null (disabled / not found / error).
+            enrichPoi: function (poi) {
+                if (!Innsight._enrichment || !Innsight._enrichment.enrichPoi) return Promise.resolve(null);
+                return Innsight._enrichment.enrichPoi(poi, state.normalized).then(function (data) {
+                    if (data) state.events.emit('poi:enriched', { poi: poi, data: data });
+                    return data;
+                });
+            },
             refresh: function (newConfig) {
                 if (state.destroyed) return instance;
                 state.normalized = Innsight._config.normalize(newConfig);
@@ -157,10 +168,8 @@
             state.ready = true;
             state.events.emit('ready', state.instance);
 
-            // 11) Optional Google Places enrichment.
-            if (Innsight._enrichment) {
-                Innsight._enrichment.enrich(state).catch(function () {});
-            }
+            // Google Places enrichment is on-demand now (per-POI when the
+            // sheet opens), wired via instance.enrichPoi. No bulk init pass.
 
             return state.instance;
         }).catch(function (err) {

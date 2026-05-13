@@ -241,6 +241,15 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
+    /* Compact review count: 1.2k / 12k / 123 */
+    SkinController.prototype.formatCount = function (n) {
+        n = Number(n);
+        if (!isFinite(n)) return '';
+        if (n >= 10000) return Math.round(n / 1000) + 'k';
+        if (n >= 1000)  return (n / 1000).toFixed(1) + 'k';
+        return String(n);
+    };
+
     /* ── Sort dropdown ───────────────────────────────────────────────────── */
     SkinController.prototype.bindSortMenu = function () {
         var self = this;
@@ -499,6 +508,43 @@
             root.document.body.classList.add('innsight-sheet-locked');
         }
         this.maybePlayHint();
+        // On-demand Google Places enrichment. Fires only when the user
+        // opens this POI's sheet (caches per POI in localStorage so a re-
+        // open is free). Re-renders the sheet when the data lands.
+        this.requestEnrichment(poi);
+    };
+
+    /**
+     * Ask the engine to fetch Places data for this POI. Merge selected
+     * fields back into the POI in-place so re-renders use the enriched
+     * values, then re-render if the sheet is still showing the same POI.
+     */
+    SkinController.prototype.requestEnrichment = function (poi) {
+        if (!this.state.instance || !this.state.instance.enrichPoi) return;
+        var self = this;
+        this.state.instance.enrichPoi(poi).then(function (data) {
+            if (!data) return;
+            // Map Places fields onto the POI shape the template renders.
+            if (data.rating != null)          poi.rating = data.rating;
+            if (data.userRatingCount != null) poi.userRatingCount = data.userRatingCount;
+            if (data.openNow != null)         poi.open = data.openNow;
+            if (data.todaysHours)             poi.hours = data.todaysHours;
+            if (data.googleMapsUri)           poi.googleMapsUri = data.googleMapsUri;
+            if (data.websiteUri && !poi.button.url) {
+                poi.button.url = data.websiteUri;
+                if (!poi.button.text) poi.button.text = 'Website';
+            }
+            if (data.photoUrl && !poi.image) {
+                poi.image = data.photoUrl;
+                poi.imageThumb = data.photoUrl;
+            }
+            poi.places = data; // full payload available to templates that want it
+            // Only re-render if the sheet is still on this POI (user may
+            // have already swiped to the next one).
+            if (self.sheet.poi && String(self.sheet.poi.id) === String(poi.id)) {
+                self.renderSheet();
+            }
+        });
     };
     SkinController.prototype.closeSheet = function () {
         this.app.classList.remove('is-sheet-open');
@@ -612,6 +658,16 @@
         var cat = this.catById[poi.cat] || this.catById[poi.type] || { label: '', color: '#0F0F0F' };
         var tags = (poi.tag || '').split('·').map(function (s) { return s.trim(); }).filter(Boolean);
         var firstTag = tags[0] || '';
+        // Format the rating chip: bare "4.5" if no review count yet, else
+        // "4.5 (123)" once Places enrichment lands.
+        var ratingNum = poi.rating != null ? Number(poi.rating) : null;
+        var ratingLabel = '';
+        if (ratingNum != null && !isNaN(ratingNum)) {
+            ratingLabel = ratingNum.toFixed(1);
+            if (poi.userRatingCount) {
+                ratingLabel += ' (' + this.formatCount(poi.userRatingCount) + ')';
+            }
+        }
         var ctx = {
             id: poi.id, title: poi.title || poi.name || '',
             initial: (poi.title || poi.name || '·').charAt(0).toUpperCase(),
@@ -625,7 +681,9 @@
             blurb: poi.blurb || poi.description || '',
             hours: poi.hours || '',
             dist: poi.dist || '',
-            rating: poi.rating != null ? Number(poi.rating).toFixed(1) : '',
+            rating: ratingNum != null ? ratingNum.toFixed(1) : '',
+            ratingLabel: ratingLabel,
+            googleMapsUri: poi.googleMapsUri || '',
             open: poi.open ? 'true' : 'false',
             openLabel: poi.open ? 'Open now' : 'Closed',
             button: { url: (poi.button && poi.button.url) || '', text: (poi.button && poi.button.text) || 'Directions' }

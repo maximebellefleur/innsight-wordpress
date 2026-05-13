@@ -955,6 +955,21 @@ body.innsight-sheet-locked {
     font-variant-numeric: tabular-nums;
 }
 
+/* Google Maps "View on" link below the sheet actions. Subtle, not a button. */
+.in-sheet__gmaps {
+    display: block;
+    margin-top: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--in-mute);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+.in-sheet__gmaps:hover { color: var(--in-ink); }
+
+.in-sheet__tag--rating { background: var(--in-accent); }
+
 /* ── Live location pulse marker ──────────────────────────────────────────── */
 .in-livedot {
     position: relative;
