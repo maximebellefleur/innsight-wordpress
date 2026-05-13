@@ -59,8 +59,18 @@ Re-running the same import is safe: existing posts are matched by `osm_id` (or, 
 
 ## Shortcode
 
+The plugin registers **two shortcode names that behave identically**:
+
+- `[custom_map]` - the legacy yuna-innsight tag. Existing pages already using this keep working without any edit. Recommended for migration.
+- `[innsight_map]` - the new canonical tag. Use it in fresh content if you want to be explicit about which engine renders the map.
+
+Both accept the same attributes, both call the same `Shortcode::render()` method. Switching one to the other is a no-op.
+
 ```text
-[innsight_map post_id="123" location="Interlaken, Switzerland" zoom="13" viewmode="multi" height="80vh" provider="mapbox" skin="solike2025"]
+[custom_map]                                          <- no args, drives everything from
+                                                          Settings + the page's ACF fields
+[custom_map post_id="123" viewmode="single"]          <- override the source post / mode
+[innsight_map height="80vh"]                          <- new canonical tag, same behavior
 ```
 
 | Attribute | Default | Description |
@@ -70,12 +80,12 @@ Re-running the same import is safe: existing posts are matched by `osm_id` (or, 
 | `zoom` | ACF `map_zoom_level` or 12 | Initial zoom (1 - 20). |
 | `viewmode` | `multi` | `event`, `single`, `act`, `multi`, `blogs` - matches legacy plugin behavior. |
 | `height` | `70vh` | CSS length applied to the map container. Validated against an allowlist. |
-| `provider` | settings.provider_default | `osm`, `mapbox`, or `google` (stub). |
-| `skin` | settings.skin_name | Skin folder name under `skins/`. |
-| `render_mode` | settings.render_mode | `inline` (no extra HTTP) or `fetch` (REST). |
+| `provider` | `Settings > Innsight > Default provider` | Per-render override. One of `osm`, `mapbox`, `mapbox-gl`, `google` (google is a v0.2 stub). |
+| `skin` | `Settings > Innsight > Design` | Per-render override. One of `solike2025`, `innsight2026`. |
+| `render_mode` | `Settings > Innsight > Render mode` | `inline` (no extra HTTP) or `fetch` (REST). |
 | `taxonomy_slug`, `taxonomy_id` | empty | Optional filter for the `multi` viewmode. |
 
-`[custom_map ...]` is registered as an alias of `[innsight_map ...]` so existing pages keep working.
+**For migration, you don't have to touch any shortcode argument.** Set `Design` in Settings -> Innsight to choose `solike2025` (legacy look) or `innsight2026` (new design); paste your Mapbox token when picking innsight2026; save; reload your existing `[custom_map]` pages.
 
 ## REST endpoints
 
