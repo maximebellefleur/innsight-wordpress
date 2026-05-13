@@ -73,7 +73,10 @@ final class PoiPostType {
         register_post_type( self::POST_TYPE, array(
             'public'             => true,
             'show_ui'            => true,
-            'show_in_menu'       => true,
+            // Show as a sub-page of the top-level Innsight menu (registered
+            // by Admin) instead of as its own top-level entry. This collapses
+            // the admin sidebar to a single Innsight section.
+            'show_in_menu'       => 'innsight',
             'show_in_rest'       => true,
             'rest_base'          => 'pois',
             'has_archive'        => false,

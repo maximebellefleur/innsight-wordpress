@@ -46,10 +46,11 @@ final class DefaultsPage {
     }
 
     public function register_menu(): void {
+        // Hangs off the top-level "Innsight" menu (registered by Admin).
         add_submenu_page(
-            'options-general.php',
-            __( 'Innsight Defaults', 'innsight' ),
-            __( 'Innsight Defaults', 'innsight' ),
+            'innsight',
+            __( 'Map Defaults', 'innsight' ),
+            __( 'Map Defaults', 'innsight' ),
             'manage_options',
             self::PAGE_SLUG,
             array( $this, 'render_page' )

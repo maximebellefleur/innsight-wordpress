@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.2 - 2026-05-12
+
+- **Top-level "Innsight" admin menu** with a custom compass SVG icon.
+  Previously the plugin spread three sub-pages under Settings (Innsight,
+  Innsight Defaults, Innsight Import). Now there is one branded section in
+  the WP sidebar with sub-items: Settings, Map Defaults, POIs, Add POI,
+  Import. The POIs post type's menu is collapsed in here too via
+  `show_in_menu => 'innsight'`.
+- **Bug fix: `mapbox-gl` is now selectable from the Default provider
+  dropdown.** Symptom: picking the new innsight2026 design + saving made
+  the provider field "snap back" to OpenStreetMap on reload. Cause: the
+  sanitizer auto-forces provider to `mapbox-gl` when the design is
+  innsight2026, but `mapbox-gl` was missing from the dropdown's option
+  list, so the saved value couldn't be selected and the browser
+  fell back to the first option (osm). The value WAS saved correctly;
+  only the display was wrong. Fixed by adding `mapbox-gl` to the dropdown.
+
 ## 0.4.1 - 2026-05-12
 
 - Shortcode bootstrap: poll for `Innsight.init` specifically rather than the

@@ -27,13 +27,44 @@ final class Admin {
     }
 
     public function register_menu(): void {
-        add_options_page(
+        // Top-level "Innsight" menu with a compass SVG icon. Other classes
+        // (DefaultsPage, ImportPage) and the `poi` post type all hang their
+        // sub-pages off this parent slug ('innsight'), giving the admin a
+        // single branded section instead of three Settings sub-items.
+        add_menu_page(
             __( 'Innsight', 'innsight' ),
             __( 'Innsight', 'innsight' ),
             'manage_options',
             self::PAGE_SLUG,
+            array( $this, 'render_page' ),
+            $this->menu_icon_data_uri(),
+            25
+        );
+        // First sub-page must reuse the parent slug so it becomes the
+        // landing page when the user clicks the top-level item.
+        add_submenu_page(
+            self::PAGE_SLUG,
+            __( 'Settings', 'innsight' ),
+            __( 'Settings', 'innsight' ),
+            'manage_options',
+            self::PAGE_SLUG,
             array( $this, 'render_page' )
         );
+    }
+
+    /**
+     * Compass SVG inlined as a data URI for the WP admin menu icon.
+     * Uses currentColor so WP's icon-color CSS (light/dark admin themes)
+     * paints it correctly. 20x20 viewBox per WP's icon convention.
+     */
+    private function menu_icon_data_uri(): string {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">'
+             . '<circle cx="10" cy="10" r="7.4" fill="none" stroke="black" stroke-width="1.4"/>'
+             . '<path d="M10 3.6 L7.5 10.5 L10 9.2 L12.5 10.5 Z" fill="black"/>'
+             . '<path d="M10 16.4 L7.5 9.5 L10 10.8 L12.5 9.5 Z" fill="black" opacity=".4"/>'
+             . '<circle cx="10" cy="10" r="0.9" fill="white" stroke="black" stroke-width=".5"/>'
+             . '</svg>';
+        return 'data:image/svg+xml;base64,' . base64_encode( $svg );
     }
 
     public function register_settings(): void {
@@ -149,9 +180,10 @@ final class Admin {
 
     public function render_provider_default( string $key, $value ): void {
         $opts = array(
-            'osm'    => __( 'OpenStreetMap', 'innsight' ),
-            'mapbox' => __( 'Mapbox', 'innsight' ),
-            'google' => __( 'Google Maps (v0.2 stub)', 'innsight' ),
+            'osm'       => __( 'OpenStreetMap (Leaflet)', 'innsight' ),
+            'mapbox'    => __( 'Mapbox raster (Leaflet + Mapbox tiles)', 'innsight' ),
+            'mapbox-gl' => __( 'Mapbox GL JS (vector - used by innsight2026 design)', 'innsight' ),
+            'google'    => __( 'Google Maps (v0.2 stub)', 'innsight' ),
         );
         echo '<select name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '">';
         foreach ( $opts as $k => $label ) {

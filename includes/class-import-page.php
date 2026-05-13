@@ -51,10 +51,11 @@ final class ImportPage {
     }
 
     public function register_menu(): void {
+        // Hangs off the top-level "Innsight" menu (registered by Admin).
         add_submenu_page(
-            'options-general.php',
-            __( 'Innsight Import', 'innsight' ),
-            __( 'Innsight Import', 'innsight' ),
+            'innsight',
+            __( 'Import POIs', 'innsight' ),
+            __( 'Import', 'innsight' ),
             'manage_options',
             self::PAGE_SLUG,
             array( $this, 'render_page' )
