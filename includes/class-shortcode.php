@@ -145,7 +145,12 @@ final class Shortcode {
         $config_js  = 'window.' . $config_var . '=' . wp_json_encode( $config ) . ';';
         $init_js    = 'Innsight.init({target:' . wp_json_encode( '#' . $dom_id ) . ',config:window.' . $config_var . '});';
 
-        return $partials_block . '<script>(function(){function _go(){if(typeof Innsight==="undefined"){return setTimeout(_go,30);}' . $config_js . $init_js . '}_go();})();</script>';
+        // The engine loads as ~20 individual <script> tags; each earlier
+        // module creates `window.Innsight = { _utils: ... }` before innsight.js
+        // attaches `.init`. A `typeof Innsight === "undefined"` check passes
+        // too early (Innsight is "object", not "undefined") and we'd call a
+        // function that doesn't exist yet. Wait for `.init` specifically.
+        return $partials_block . '<script>(function(){function _go(){if(!window.Innsight||typeof window.Innsight.init!=="function"){return setTimeout(_go,30);}' . $config_js . $init_js . '}_go();})();</script>';
     }
 
     private function render_fetch_bootstrap( string $dom_id, array $atts ): string {
@@ -156,7 +161,7 @@ final class Shortcode {
             ),
             rest_url( 'innsight/v1/map' )
         );
-        return '<script>(function(){function _go(){if(typeof Innsight==="undefined"){return setTimeout(_go,30);}Innsight.init({target:' . wp_json_encode( '#' . $dom_id ) . ',configUrl:' . wp_json_encode( $url ) . '});}_go();})();</script>';
+        return '<script>(function(){function _go(){if(!window.Innsight||typeof window.Innsight.init!=="function"){return setTimeout(_go,30);}Innsight.init({target:' . wp_json_encode( '#' . $dom_id ) . ',configUrl:' . wp_json_encode( $url ) . '});}_go();})();</script>';
     }
 
     /**
