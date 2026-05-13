@@ -106,7 +106,10 @@
     top: 232px; right: 14px;
     z-index: 45;
     display: flex; flex-direction: column;
-    filter: drop-shadow(2px 2px 0 var(--in-ink));
+    /* Stack with breathing room between buttons. Each tile gets its own
+     * drop-shadow filter so they read as separate cards rather than a
+     * single segmented control. */
+    gap: 8px;
     transition: top 220ms ease;
 }
 .in-mapctl__btn {
@@ -114,17 +117,14 @@
     background: var(--in-surface);
     color: var(--in-ink);
     border: 1.5px solid var(--in-ink);
-    border-bottom: 0.75px solid var(--in-mute2);
-    border-radius: 0;
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--in-ink);
     display: inline-flex; align-items: center; justify-content: center;
     cursor: pointer;
     padding: 0;
 }
 .in-mapctl__btn--first { border-top-left-radius: 14px; border-top-right-radius: 14px; }
-.in-mapctl__btn--last  {
-    border-bottom: 1.5px solid var(--in-ink);
-    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
-}
+.in-mapctl__btn--last  { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
 
 /* Fullscreen wordmark pill (only visible in fullscreen) */
 .in-wordmark-pill {
@@ -459,9 +459,11 @@
     font-family: var(--in-font-display);
     font-style: italic;
     font-size: 78px; line-height: 0.85;
-    color: var(--in-ink);
+    /* Always white over the photo + multiply wash. Dark layered shadow gives
+     * legibility on any underlying hue. */
+    color: #fff;
     letter-spacing: -0.02em;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.35);
 }
 .in-hero__tagpill {
     position: absolute;
@@ -552,9 +554,14 @@
     display: inline-flex; align-items: center; justify-content: center;
     text-decoration: none;
 }
-.in-sheet__act--primary {
+.in-sheet__act--primary,
+.in-sheet__act--primary:visited,
+.in-sheet__act--primary:hover,
+.in-sheet__act--primary:focus {
+    /* Pure white text - cream (--in-bg) on ink reads too dim. Both
+     * the <button> and <a> form get the same color. */
     background: var(--in-ink);
-    color: var(--in-bg);
+    color: #ffffff;
     border-color: var(--in-ink);
 }
 
@@ -830,4 +837,48 @@
 @media (prefers-reduced-motion: reduce) {
     .in-pin, .in-row, .in-sheet, .in-sheet__inner.is-hint { animation: none !important; transition: none !important; }
     .in-nearby__dot { animation: none !important; }
+}
+
+/* ── v0.4.5 overrides ────────────────────────────────────────────────────── */
+
+/* Search box: themes sometimes inject grey input/form backgrounds; force
+ * pure white on both the wrapper and the input itself. */
+.in-app .in-search,
+.in-app .in-list__search .in-search { background: #ffffff; }
+.in-app .in-search__input { background: transparent; color: var(--in-ink); }
+.in-app .in-search__input:focus { outline: none; }
+
+/* Hide the "You" tab and the profile circle in v0.4.x. They are reserved
+ * for a future user-account feature; keeping them visible but inert misled
+ * testers. Re-enable by overriding `display` in a child theme. */
+.in-app .in-tabs .in-tab[data-route="me"] { display: none; }
+.in-app .in-profile { display: none; }
+
+/* Toast notification (used by Save / Remove). Anchored above the tab bar
+ * so it never collides with sheet content. */
+.in-toast {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--in-ink);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 200;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+    transition: opacity 220ms ease, transform 220ms cubic-bezier(.32, .72, .2, 1);
+    white-space: nowrap;
+}
+.in-toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Save button toggled "saved" state - accent fill + ink text + check icon. */
+.in-sheet__act.is-saved {
+    background: var(--in-accent);
+    color: var(--in-ink);
+    border-color: var(--in-ink);
 }

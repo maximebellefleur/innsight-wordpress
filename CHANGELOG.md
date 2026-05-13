@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.4.5 - 2026-05-12
+
+Visual + UX batch:
+
+- **Sheet description renders HTML again.** The blurb template was using
+  `{{blurb}}` (HTML-escaped), so POIs whose ACF description contains
+  `<b>...</b>` or `<p>...</p>` showed the markup as text. Switched to
+  `{{{blurb}}}` (raw) inside a `<div class="in-sheet__blurb">` so block
+  tags are valid.
+- **Hero initial is white again** over the photo + multiply wash, with a
+  layered dark shadow for legibility on any underlying hue.
+- **Directions button text is pure white** for both the `<button>` and
+  `<a>` forms (was reading cream on ink, slightly too dim).
+- **Search box forced to white.** Themes that inject form styling were
+  turning the wrapper light grey.
+- **Map controls have breathing room.** Fullscreen / + / - tiles now
+  stack with 8px gap and each carries its own offset shadow, so they
+  read as three distinct controls rather than a segmented column.
+- **"You" tab + profile circle hidden.** They are reserved for a future
+  user-account feature; visible-but-inert was misleading testers. Both
+  re-enable cleanly from a child theme.
+- **Filter snaps the map to the remaining POIs.** Tapping a chip used to
+  hide markers without moving the camera; you'd lose the visible result
+  set if it lived at the edge or off-screen. The engine now fits bounds
+  to whatever stays visible after a cat/query filter (single-point case
+  uses setView at zoom 15 to avoid maxZoom collapse).
+- **Save button is real.** Toggles a POI in `localStorage`
+  (`innsight.savedPois`), flips its label to `Saved ✓` with an accent
+  fill, shows a "Saved!" / "Removed from saved" toast above the tab
+  bar, and re-opening the same POI reflects the persisted state. Hosts
+  can still listen to the `sheet:save` event for remote sync.
+- **Fullscreen tries the real Fullscreen API.** When the shortcode is
+  inside a page-builder iframe (Elementor / Divi / etc.), the previous
+  CSS-only fullscreen only filled the iframe rect. Now we request the
+  top document's `requestFullscreen()` first (same-origin), falling back
+  silently to the CSS class on cross-origin or denial.
+
+Known deferred (next batch):
+- Sort dropdown (A->Z / Z->A) on the list view
+- "X km from the hostel" on list rows
+- List thumbnail size + cache headers
+- Live location pulse + editable backpack-emoji icon
+- Surfacing Google Places fields (rating / open / reviews) in the sheet
+  - the engine already enriches when a POI has a `googlePlaceId`; legacy
+  yuna data does not, so a lookup step is needed first.
+
 ## 0.4.4 - 2026-05-12
 
 - **Fix: stale legacy loader looping forever in PWA / on map pages.** The

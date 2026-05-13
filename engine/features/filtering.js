@@ -81,12 +81,59 @@
             applyQuery(state);
         }
 
+        // Refit the map to whatever is still visible. Without this the user
+        // tap on "Eats" hides 90% of the pins but the camera stays parked on
+        // the original bounds, leaving the few remaining pins at the edge or
+        // even outside the viewport.
+        fitToVisible(state);
+
         state.events.emit('filter:change', {
             soloMode: state.soloMode,
             types:    Array.isArray(opts.types) ? opts.types : null,
             cat:      typeof opts.cat === 'string' ? opts.cat : null,
             query:    state.query || ''
         });
+    }
+
+    /**
+     * Recompute the bounds from currently-visible markers and fitBounds the
+     * provider to them. Markers hidden via the cat / query path have their
+     * host element set to display:none; we skip those.
+     */
+    function fitToVisible(state) {
+        if (!state.provider || !state.markers || !state.markers.length) return;
+        var pts = [];
+        state.markers.forEach(function (entry) {
+            var hidden = false;
+            if (entry.marker && entry.marker._innsightEl) {
+                hidden = entry.marker._innsightEl.style.display === 'none';
+            } else if (entry.marker && entry.marker._icon) {
+                hidden = entry.marker._icon.style.display === 'none';
+            }
+            // Also check if the cluster group is hidden.
+            if (!hidden && entry.group && state.groupTypes && state.groupTypes[entry.group]) {
+                var g = state.groupTypes[entry.group];
+                if (g && g._visible === false) hidden = true;
+            }
+            if (!hidden) pts.push([entry.poi.lat, entry.poi.lon]);
+        });
+        if (pts.length === 0) return;
+        if (pts.length === 1) {
+            // Single point: setView gives a sensible zoom rather than fitBounds
+            // collapsing to maxZoom.
+            if (state.provider.setView) state.provider.setView({ lat: pts[0][0], lon: pts[0][1] }, 15);
+            return;
+        }
+        var minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+        for (var i = 0; i < pts.length; i++) {
+            if (pts[i][0] < minLat) minLat = pts[i][0];
+            if (pts[i][0] > maxLat) maxLat = pts[i][0];
+            if (pts[i][1] < minLon) minLon = pts[i][1];
+            if (pts[i][1] > maxLon) maxLon = pts[i][1];
+        }
+        if (state.provider.fitBounds) {
+            state.provider.fitBounds([[minLat, minLon], [maxLat, maxLon]]);
+        }
     }
 
     /**

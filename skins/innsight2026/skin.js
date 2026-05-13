@@ -158,6 +158,26 @@
     SkinController.prototype.toggleFullscreen = function () {
         this.fullscreen = !this.fullscreen;
         this.app.classList.toggle('is-fullscreen', this.fullscreen);
+
+        // Real Fullscreen API. When the shortcode renders inside a
+        // page-builder iframe (Elementor / Divi / etc.), the CSS-only
+        // fullscreen only fills the iframe rect, not the device viewport.
+        // Try the browser's Fullscreen API on the top document so the page
+        // escapes the iframe. Cross-origin iframes throw on access; we
+        // catch and fall back to CSS-only.
+        try {
+            var doc = root.document;
+            try { if (root.top && root.top.document) doc = root.top.document; } catch (e) {}
+            var el = doc.documentElement || doc.body;
+            if (this.fullscreen) {
+                var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+                if (req) req.call(el);
+            } else {
+                var ex = doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+                if (ex && (doc.fullscreenElement || doc.webkitFullscreenElement)) ex.call(doc);
+            }
+        } catch (e) { /* CSS class still applies */ }
+
         // Map sometimes needs a resize after the chrome collapses.
         var p = this.state.provider;
         if (p && p.invalidateSize) setTimeout(function () { p.invalidateSize(); }, 240);
@@ -289,13 +309,77 @@
         var next = inner.querySelector('[data-innsight-sheet-next]');
         if (prev) prev.addEventListener('click', function () { self.navigateSheet(-1); });
         if (next) next.addEventListener('click', function () { self.navigateSheet(+1); });
-        // Save button (placeholder - pure UI in v0.1; emit event for hosts).
+        // Save button. Click toggles the POI's saved state in localStorage,
+        // updates the button visual, and shows a toast. Re-opening the sheet
+        // reflects the persisted state. Hosts can listen for 'sheet:save' to
+        // sync to a remote backend if needed.
         var saveBtn = inner.querySelector('[data-innsight-sheet-save]');
-        if (saveBtn) saveBtn.addEventListener('click', function () {
-            self.state.events.emit('sheet:save', poi);
-        });
+        if (saveBtn) {
+            // Reflect the persisted state on initial render.
+            if (this.isPoiSaved(poi)) {
+                saveBtn.classList.add('is-saved');
+                saveBtn.textContent = 'Saved ✓';
+            }
+            saveBtn.addEventListener('click', function () { self.toggleSavedPoi(poi, saveBtn); });
+        }
         // Bind swipe.
         this.bindSheetSwipe(inner);
+    };
+
+    /* ── Save / localStorage / toast ─────────────────────────────────────── */
+    var SAVED_KEY = 'innsight.savedPois';
+
+    SkinController.prototype.readSaved = function () {
+        try { return JSON.parse(root.localStorage.getItem(SAVED_KEY) || '{}') || {}; }
+        catch (e) { return {}; }
+    };
+
+    SkinController.prototype.writeSaved = function (obj) {
+        try { root.localStorage.setItem(SAVED_KEY, JSON.stringify(obj || {})); } catch (e) {}
+    };
+
+    SkinController.prototype.isPoiSaved = function (poi) {
+        var saved = this.readSaved();
+        return !!(poi && saved[ String(poi.id) ]);
+    };
+
+    SkinController.prototype.toggleSavedPoi = function (poi, btn) {
+        var saved = this.readSaved();
+        var id = String(poi.id);
+        if (saved[id]) {
+            delete saved[id];
+            this.writeSaved(saved);
+            if (btn) { btn.classList.remove('is-saved'); btn.textContent = 'Save'; }
+            this.showToast('Removed from saved');
+            this.state.events.emit('sheet:save', { poi: poi, saved: false });
+        } else {
+            saved[id] = { id: poi.id, title: poi.title || poi.name || '', cat: poi.cat || poi.type || '', savedAt: Date.now() };
+            this.writeSaved(saved);
+            if (btn) { btn.classList.add('is-saved'); btn.textContent = 'Saved ✓'; }
+            this.showToast('Saved!');
+            this.state.events.emit('sheet:save', { poi: poi, saved: true });
+        }
+    };
+
+    SkinController.prototype.showToast = function (message) {
+        // Remove any existing toast so rapid clicks don't stack them.
+        var existing = this.target.querySelectorAll('.in-toast');
+        for (var i = 0; i < existing.length; i++) existing[i].parentNode.removeChild(existing[i]);
+
+        var toast = document.createElement('div');
+        toast.className = 'in-toast';
+        toast.textContent = message;
+        this.target.appendChild(toast);
+        // Force layout so the transition fires (next paint).
+        // eslint-disable-next-line no-unused-expressions
+        toast.offsetWidth;
+        toast.classList.add('is-visible');
+        setTimeout(function () {
+            toast.classList.remove('is-visible');
+            setTimeout(function () {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            }, 240);
+        }, 1800);
     };
 
     SkinController.prototype.buildSheetContext = function (poi) {
