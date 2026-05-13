@@ -51,6 +51,14 @@ final class Settings {
             'kml_export'           => 1,
             'solo_mode'            => 1,
 
+            // Live location: when enabled, the engine asks the browser for
+            // the user's coordinates and drops a pulsing marker on the map.
+            // The icon can be any single character (emoji recommended) -
+            // 🎒 backpack by default to fit the tourism / "in the know"
+            // brand. Set to an empty string to render a colored dot instead.
+            'live_location'        => 1,
+            'live_location_icon'   => '🎒',
+
             // Geocoder.
             'geocoder_email'       => '',                   // Sent in Nominatim User-Agent (politeness header).
             'geocoder_cache_hours' => 24 * 30,              // 30 days; geocodes are stable.
@@ -92,6 +100,14 @@ final class Settings {
             : $defaults['google_places_fields'];
         $clean['kml_export']           = ! empty( $raw['kml_export'] ) ? 1 : 0;
         $clean['solo_mode']            = ! empty( $raw['solo_mode'] ) ? 1 : 0;
+        $clean['live_location']        = ! empty( $raw['live_location'] ) ? 1 : 0;
+        // Single grapheme allowed - usually one emoji. Strip tags so a
+        // theme injection can't sneak in HTML attrs through the field.
+        $clean['live_location_icon']   = isset( $raw['live_location_icon'] ) ? trim( wp_strip_all_tags( (string) $raw['live_location_icon'] ) ) : $defaults['live_location_icon'];
+        // Cap length so a misuse doesn't blow up the map marker.
+        if ( strlen( $clean['live_location_icon'] ) > 16 ) {
+            $clean['live_location_icon'] = mb_substr( $clean['live_location_icon'], 0, 4 );
+        }
         $clean['geocoder_email']       = isset( $raw['geocoder_email'] ) ? sanitize_email( $raw['geocoder_email'] ) : '';
         $clean['geocoder_cache_hours'] = isset( $raw['geocoder_cache_hours'] ) ? max( 1, (int) $raw['geocoder_cache_hours'] ) : $defaults['geocoder_cache_hours'];
         $clean['render_mode']          = in_array( $raw['render_mode'] ?? '', array( 'inline', 'fetch' ), true ) ? $raw['render_mode'] : 'inline';

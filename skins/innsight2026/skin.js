@@ -74,10 +74,69 @@
         this.route = 'map';
         this.cat = 'all';
         this.query = '';
+        this.sort = 'nearest';   // 'nearest' | 'az' | 'za'
         this.fullscreen = false;
         this.sheet = { poi: null, hintShown: false, drag: 0, swiping: false, startX: 0, startY: 0, hintTimer: null };
         this.app = this.target.querySelector('.in-app');
+        // Cache the hostel POI (or any POI marked pinned=true) so we can
+        // compute "distance from base" for every other POI without scanning
+        // on every render.
+        this.hostelRef = this.findHostelRef();
+        if (this.hostelRef) this.annotateDistances();
     }
+
+    /**
+     * Find a stable reference point for the "X km from base" label.
+     * Priority: POI with pinned===true, then any POI of type/cat 'hostel',
+     * then fall back to the map center, then null (skips the label).
+     */
+    SkinController.prototype.findHostelRef = function () {
+        var pois = this.cfg.pois || [];
+        for (var i = 0; i < pois.length; i++) {
+            if (pois[i].pinned) return { lat: +pois[i].lat, lon: +pois[i].lon, source: 'pinned' };
+        }
+        for (var j = 0; j < pois.length; j++) {
+            if (pois[j].type === 'hostel' || pois[j].cat === 'hostel') return { lat: +pois[j].lat, lon: +pois[j].lon, source: 'hostel-type' };
+        }
+        if (this.cfg.map && this.cfg.map.center) {
+            return { lat: +this.cfg.map.center.lat, lon: +this.cfg.map.center.lon, source: 'map-center' };
+        }
+        return null;
+    };
+
+    /**
+     * Annotate every POI with its great-circle distance to the reference
+     * point. Result stored in poi.__distMeters so we can sort and format
+     * later without recomputing. Haversine, returns metres.
+     */
+    SkinController.prototype.annotateDistances = function () {
+        var ref = this.hostelRef;
+        if (!ref) return;
+        var R = 6371000; // earth radius in metres
+        var toRad = function (d) { return d * Math.PI / 180; };
+        var refLat = toRad(ref.lat), refLon = toRad(ref.lon);
+        (this.cfg.pois || []).forEach(function (p) {
+            var lat = toRad(+p.lat), lon = toRad(+p.lon);
+            var dLat = lat - refLat, dLon = lon - refLon;
+            var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(refLat) * Math.cos(lat) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            p.__distMeters = R * c;
+        });
+    };
+
+    /**
+     * Human-readable "1.2 km" / "240 m" / "" if missing. Skips formatting
+     * the hostel POI itself.
+     */
+    SkinController.prototype.formatDist = function (poi) {
+        if (!this.hostelRef || poi.pinned) return '';
+        var m = poi.__distMeters;
+        if (typeof m !== 'number' || isNaN(m)) return '';
+        if (m < 1000) return Math.round(m) + ' m';
+        return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
+    };
 
     SkinController.prototype.boot = function () {
         this.applyBranding();
@@ -86,10 +145,159 @@
         this.bindMapControls();
         this.bindTabs();
         this.bindSheetBackdrop();
+        this.bindSortMenu();
         this.bindEngineEvents();
+        this.startLiveLocation();
         this.updateCounts();
         // Sync route class on first render so CSS scope variants apply.
         this.setRoute('map');
+    };
+
+    /* ── Live location ───────────────────────────────────────────────────── */
+
+    /**
+     * Ask the browser for the user's coordinates (with permission) and place
+     * a pulsing marker on the map. The icon is configurable via plugin
+     * Settings (default: 🎒 backpack emoji). Skipped when:
+     *   - the Geolocation API is unavailable
+     *   - cfg.ui.liveLocation.enabled === false (admin opted out)
+     *   - the user denies the permission prompt
+     * Updates the marker as the watch reports new positions so the dot
+     * tracks the user.
+     */
+    SkinController.prototype.startLiveLocation = function () {
+        var liveCfg = (this.cfg.ui && this.cfg.ui.liveLocation) || {};
+        if (!liveCfg.enabled) return;
+        if (!root.navigator || !root.navigator.geolocation) return;
+
+        var self = this;
+        var icon = liveCfg.icon || '';
+        var firstFix = true;
+        root.navigator.geolocation.watchPosition(function (pos) {
+            self.placeLiveMarker(pos.coords.latitude, pos.coords.longitude, icon);
+            // Center the map on the first fix; subsequent updates just move
+            // the marker (don't yank the camera).
+            if (firstFix) {
+                firstFix = false;
+                self.recenterOnLiveLocation(pos.coords.latitude, pos.coords.longitude);
+            }
+        }, function (err) {
+            // Denied / unavailable / timeout - silent fallback, the map
+            // still works without a live dot.
+            if (root.console) root.console.info('[innsight] live location skipped:', err && err.message);
+        }, { enableHighAccuracy: false, maximumAge: 30000, timeout: 12000 });
+    };
+
+    SkinController.prototype.placeLiveMarker = function (lat, lon, icon) {
+        var p = this.state.provider;
+        if (!p || !p.native) return;
+
+        // Build the DOM once; subsequent calls just move it.
+        if (!this._liveEl) {
+            var el = document.createElement('div');
+            el.className = 'in-livedot';
+            el.innerHTML = '<span class="in-livedot__pulse" aria-hidden="true"></span>'
+                         + '<span class="in-livedot__core">' + (icon ? this.escape(icon) : '') + '</span>';
+            this._liveEl = el;
+
+            // Mapbox GL provider exposes _gl; Leaflet exposes L globally.
+            if (root.mapboxgl && p.native.addControl) {
+                this._liveMarker = new root.mapboxgl.Marker({ element: el, anchor: 'center' })
+                    .setLngLat([lon, lat])
+                    .addTo(p.native);
+                return;
+            }
+            if (root.L && p.native.addLayer) {
+                var divIcon = root.L.divIcon({
+                    html: el.outerHTML,
+                    className: 'in-livedot-host',
+                    iconSize: [44, 44],
+                    iconAnchor: [22, 22]
+                });
+                this._liveMarker = root.L.marker([lat, lon], { icon: divIcon, interactive: false, keyboard: false }).addTo(p.native);
+                return;
+            }
+        }
+        // Move the existing marker to the new position.
+        if (this._liveMarker && this._liveMarker.setLngLat) {
+            this._liveMarker.setLngLat([lon, lat]);
+        } else if (this._liveMarker && this._liveMarker.setLatLng) {
+            this._liveMarker.setLatLng([lat, lon]);
+        }
+    };
+
+    SkinController.prototype.recenterOnLiveLocation = function (lat, lon) {
+        var p = this.state.provider;
+        if (!p || !p.native) return;
+        // Don't snap if the user already moved the camera deliberately
+        // (heuristic: if they have a sheet open, leave them alone).
+        if (this.sheet.poi) return;
+        if (p.setView) p.setView({ lat: lat, lon: lon }, 14);
+    };
+
+    SkinController.prototype.escape = function (str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    /* ── Sort dropdown ───────────────────────────────────────────────────── */
+    SkinController.prototype.bindSortMenu = function () {
+        var self = this;
+        var toggle = this.target.querySelector('[data-innsight-sort-toggle]');
+        var menu = this.target.querySelector('[data-innsight-sort-menu]');
+        var label = this.target.querySelector('[data-innsight-sort-label]');
+        if (!toggle || !menu) return;
+        toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = !menu.hasAttribute('hidden');
+            if (open) { menu.setAttribute('hidden', ''); toggle.setAttribute('aria-expanded', 'false'); }
+            else      { menu.removeAttribute('hidden'); toggle.setAttribute('aria-expanded', 'true'); }
+        });
+        // Close on outside click.
+        document.addEventListener('click', function (e) {
+            if (!menu.hasAttribute('hidden') && !menu.contains(e.target) && e.target !== toggle && !toggle.contains(e.target)) {
+                menu.setAttribute('hidden', '');
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+        var items = menu.querySelectorAll('[data-sort]');
+        for (var i = 0; i < items.length; i++) {
+            (function (item) {
+                item.addEventListener('click', function () {
+                    var sort = item.getAttribute('data-sort');
+                    self.sort = sort;
+                    var labels = { 'nearest': 'Nearest first', 'az': 'A → Z', 'za': 'Z → A' };
+                    if (label) label.textContent = labels[sort] || 'Nearest first';
+                    menu.setAttribute('hidden', '');
+                    toggle.setAttribute('aria-expanded', 'false');
+                    if (self.route === 'list') self.renderList();
+                });
+            })(items[i]);
+        }
+    };
+
+    /* Apply the current sort to a copy of the visible POIs. */
+    SkinController.prototype.sortPois = function (pois) {
+        var out = pois.slice();
+        var s = this.sort || 'nearest';
+        if (s === 'az') {
+            out.sort(function (a, b) {
+                return (a.title || a.name || '').localeCompare(b.title || b.name || '');
+            });
+        } else if (s === 'za') {
+            out.sort(function (a, b) {
+                return (b.title || b.name || '').localeCompare(a.title || a.name || '');
+            });
+        } else {
+            // 'nearest' - by __distMeters when available, else by ID.
+            out.sort(function (a, b) {
+                var da = typeof a.__distMeters === 'number' ? a.__distMeters : Infinity;
+                var db = typeof b.__distMeters === 'number' ? b.__distMeters : Infinity;
+                return da - db;
+            });
+        }
+        return out;
     };
 
     SkinController.prototype.applyBranding = function () {
@@ -285,11 +493,18 @@
         this.sheet.drag = 0;
         this.renderSheet();
         this.app.classList.add('is-sheet-open');
+        // Lock the document scroll so iOS Safari + Chrome Android don't fire
+        // their native pull-to-refresh while the user is dragging the sheet.
+        if (root.document && root.document.body) {
+            root.document.body.classList.add('innsight-sheet-locked');
+        }
         this.maybePlayHint();
     };
     SkinController.prototype.closeSheet = function () {
         this.app.classList.remove('is-sheet-open');
-        // Defer poi clearing so the slide-out animation has data to show.
+        if (root.document && root.document.body) {
+            root.document.body.classList.remove('innsight-sheet-locked');
+        }
         var self = this;
         setTimeout(function () { self.sheet.poi = null; }, 280);
     };
@@ -441,30 +656,89 @@
         this.renderSheet();
     };
 
+    /**
+     * Three coexisting gestures on the sheet:
+     *   - Horizontal swipe (anywhere) -> prev/next POI in category
+     *   - Vertical drag DOWN from the top zone (grabber + nav row) -> close
+     *   - Native scroll (vertical, below the top zone) -> scrolls sheet content
+     * The mode is decided on the first move past an 8px threshold and stays
+     * locked for the rest of that gesture. Buttons / links cancel the
+     * gesture entirely so taps still fire.
+     */
     SkinController.prototype.bindSheetSwipe = function (inner) {
         var self = this;
-        var startX = 0, startY = 0, dx = 0, swiping = false;
+        var startX = 0, startY = 0, dx = 0, dy = 0, mode = null, active = false, topZone = false;
+        var TOP_ZONE_PX = 90;
+        var HORIZ_THRESHOLD = 70;
+        var VERT_CLOSE_THRESHOLD = 110;
+
         function onDown(e) {
-            if (e.target.closest('button, a')) return;
-            startX = e.clientX; startY = e.clientY; dx = 0; swiping = true;
+            if (e.target.closest('button, a, input, select, textarea')) return;
+            startX = e.clientX; startY = e.clientY;
+            dx = 0; dy = 0;
+            mode = null;
+            active = true;
+            // "Top zone" = first ~90px of the sheet (grabber + nav row).
+            // Only vertical drags STARTING here close the sheet; below this,
+            // vertical scroll is native (the content area can scroll).
+            var rect = inner.getBoundingClientRect();
+            topZone = (e.clientY - rect.top) < TOP_ZONE_PX;
             inner.classList.remove('is-hint');
+            // Remove any in-progress snap-back transition so the drag tracks
+            // the finger instantly.
+            inner.style.transition = 'none';
+            try { inner.setPointerCapture(e.pointerId); } catch (er) {}
         }
         function onMove(e) {
-            if (!swiping) return;
-            var dy = e.clientY - startY;
+            if (!active) return;
             dx = e.clientX - startX;
-            if (Math.abs(dy) > Math.abs(dx) + 8) { swiping = false; inner.style.transform = ''; return; }
-            inner.style.transform = 'translateX(' + dx + 'px)';
-            inner.style.opacity = Math.max(0.4, 1 - Math.abs(dx) / 320);
+            dy = e.clientY - startY;
+            if (mode === null) {
+                if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+                if (Math.abs(dx) > Math.abs(dy)) mode = 'h';
+                else if (dy > 0 && topZone) mode = 'v';
+                else mode = 'native';
+            }
+            if (mode === 'h') {
+                if (e.cancelable) e.preventDefault();
+                inner.style.transform = 'translateX(' + dx + 'px)';
+                inner.style.opacity = Math.max(0.4, 1 - Math.abs(dx) / 320);
+            } else if (mode === 'v') {
+                if (e.cancelable) e.preventDefault();
+                var down = Math.max(0, dy);
+                inner.style.transform = 'translateY(' + down + 'px)';
+                inner.style.opacity = Math.max(0.5, 1 - down / 600);
+            }
+            // 'native' -> let the browser scroll the inner naturally.
         }
-        function onUp() {
-            if (!swiping) return;
-            swiping = false;
-            var threshold = 70;
-            inner.style.transform = '';
-            inner.style.opacity = '';
-            if (dx < -threshold) self.navigateSheet(+1);
-            else if (dx > threshold) self.navigateSheet(-1);
+        function onUp(e) {
+            if (!active) return;
+            active = false;
+            try { inner.releasePointerCapture(e.pointerId); } catch (er) {}
+            // Restore the sheet's standard return transition.
+            inner.style.transition = '';
+            if (mode === 'h') {
+                inner.style.transform = '';
+                inner.style.opacity = '';
+                if (dx < -HORIZ_THRESHOLD) self.navigateSheet(+1);
+                else if (dx > HORIZ_THRESHOLD) self.navigateSheet(-1);
+            } else if (mode === 'v') {
+                if (dy > VERT_CLOSE_THRESHOLD) {
+                    // Past the threshold: animate the rest of the way down
+                    // and close. Use closeSheet's own slide-out for the
+                    // backdrop fade.
+                    self.closeSheet();
+                    // closeSheet animates the whole .in-sheet wrapper; clear
+                    // the local inline transform so the wrapper's transition
+                    // is what the user sees.
+                    inner.style.transform = '';
+                    inner.style.opacity = '';
+                } else {
+                    inner.style.transform = '';
+                    inner.style.opacity = '';
+                }
+            }
+            mode = null;
         }
         inner.addEventListener('pointerdown', onDown);
         inner.addEventListener('pointermove', onMove);
@@ -497,7 +771,7 @@
     SkinController.prototype.renderList = function () {
         var host = this.target.querySelector('[data-innsight-list]');
         if (!host) return;
-        var pois = this.visiblePois();
+        var pois = this.sortPois( this.visiblePois() );
         var template = this.state.partials.listRow || this.state.partials.listItem || '';
         if (!template) return;
         if (pois.length === 0) {
@@ -512,6 +786,9 @@
             for (var k = 0; k < id.length; k++) hash = (hash + id.charCodeAt(k)) % 1e9;
             var color = palette[hash % palette.length];
             var cat = self.catById[p.cat] || self.catById[p.type] || { label: '', color: '#0F0F0F' };
+            // Prefer the smaller image variant for the 56px sticker. Falls
+            // back to the full-size `image` if the plugin didn't ship one.
+            var thumb = p.imageThumb || p.image || '';
             var ctx = {
                 id: p.id,
                 title: p.title || p.name || '',
@@ -521,7 +798,9 @@
                 categoryLabel: cat.label,
                 tag: p.tag || '',
                 dist: p.dist || '',
+                distFromHostel: self.formatDist(p),
                 image: p.image || '',
+                imageThumb: thumb,
                 rating: p.rating != null ? Number(p.rating).toFixed(1) : '',
                 open: p.open ? 'true' : 'false',
                 openShort: p.open ? 'Open' : 'Closed',

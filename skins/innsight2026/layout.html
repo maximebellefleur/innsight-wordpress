@@ -83,7 +83,14 @@
             <div class="in-chips in-chips--small" data-innsight-list-chips role="tablist" aria-label="Category filter"></div>
             <div class="in-list__sort">
                 <span class="in-list__sortlabel">SORTED BY</span>
-                <span class="in-list__sortvalue">Nearest first</span>
+                <button type="button" class="in-list__sortvalue" data-innsight-sort-toggle aria-haspopup="true" aria-expanded="false">
+                    <span data-innsight-sort-label>Nearest first</span>
+                </button>
+                <div class="in-list__sortmenu" data-innsight-sort-menu hidden role="menu">
+                    <button type="button" role="menuitem" data-sort="nearest">Nearest first</button>
+                    <button type="button" role="menuitem" data-sort="az">A → Z</button>
+                    <button type="button" role="menuitem" data-sort="za">Z → A</button>
+                </div>
                 <span class="in-spacer"></span>
                 <span class="in-list__count" data-innsight-list-results>0 results</span>
             </div>

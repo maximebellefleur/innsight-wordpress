@@ -167,10 +167,12 @@ final class DataSource {
         if ( $lat === null || $lon === null ) {
             return null;
         }
-        $maps_link = innsight_link_field( innsight_get_field( 'maps_more_info_url', 'option' ) );
-        $title     = (string) innsight_get_field( 'maps_titre', 'option', get_bloginfo( 'name' ) );
-        $desc_html = innsight_strip_paragraph_tags( (string) innsight_get_field( 'maps_text', 'option' ) );
-        $image     = innsight_attachment_url( innsight_get_field( 'maps_bg_img', 'option' ), 'medium' );
+        $maps_link  = innsight_link_field( innsight_get_field( 'maps_more_info_url', 'option' ) );
+        $title      = (string) innsight_get_field( 'maps_titre', 'option', get_bloginfo( 'name' ) );
+        $desc_html  = innsight_strip_paragraph_tags( (string) innsight_get_field( 'maps_text', 'option' ) );
+        $img_field  = innsight_get_field( 'maps_bg_img', 'option' );
+        $image      = innsight_attachment_url( $img_field, 'medium' );
+        $image_thumb = innsight_attachment_url( $img_field, 'thumbnail' );
 
         return array(
             'id'          => 'default-hostel',
@@ -182,6 +184,7 @@ final class DataSource {
             'category'    => '',
             'icon'        => 'fa-hostel',
             'image'       => $image,
+            'image_thumb' => $image_thumb,
             'button'      => array(
                 'url'  => $this->translator->url( $maps_link['url'] ),
                 'text' => $this->translator->text( $maps_link['text'] !== '' ? $maps_link['text'] : __( 'More info', 'innsight' ) ),
@@ -215,6 +218,7 @@ final class DataSource {
                 'category'    => '',
                 'icon'        => '',
                 'image'       => (string) get_the_post_thumbnail_url( $post_id, 'large' ),
+                'image_thumb' => (string) get_the_post_thumbnail_url( $post_id, 'thumbnail' ),
                 'button'      => array(
                     'url'  => $this->translator->url( get_permalink( $post_id ) ),
                     'text' => $this->translator->text( __( 'More info', 'innsight' ) ),
@@ -446,6 +450,7 @@ final class DataSource {
             'cat'         => $cat,
             'icon'        => '',
             'image'       => (string) get_the_post_thumbnail_url( $post_id, 'large' ),
+            'image_thumb' => (string) get_the_post_thumbnail_url( $post_id, 'thumbnail' ),
             'button'      => array(
                 'url'  => $this->translator->url( $btn_url ),
                 'text' => $this->translator->text( __( 'More info', 'innsight' ) ),
@@ -467,9 +472,11 @@ final class DataSource {
         if ( $lat === null || $lon === null ) {
             return null;
         }
-        $type     = (string) innsight_get_term_field( 'poi_type', $term_id, 'place' );
-        $category = (string) innsight_get_term_field( 'poi_category', $term_id );
-        $image    = innsight_attachment_url( innsight_get_term_field( 'poi_image', $term_id ), 'medium' );
+        $type        = (string) innsight_get_term_field( 'poi_type', $term_id, 'place' );
+        $category    = (string) innsight_get_term_field( 'poi_category', $term_id );
+        $img_field   = innsight_get_term_field( 'poi_image', $term_id );
+        $image       = innsight_attachment_url( $img_field, 'medium' );
+        $image_thumb = innsight_attachment_url( $img_field, 'thumbnail' );
 
         $custom_link  = innsight_link_field( innsight_get_term_field( 'poi_url_link', $term_id ) );
         $main_link    = trim( (string) innsight_get_term_field( 'main_more_info_url', $term_id ) );
@@ -486,6 +493,7 @@ final class DataSource {
             'category'    => $category,
             'icon'        => '',
             'image'       => $image,
+            'image_thumb' => $image_thumb,
             'button'      => array(
                 'url'  => $this->translator->url( $button_url ),
                 'text' => $this->translator->text( $button_text ),
@@ -517,6 +525,7 @@ final class DataSource {
             'category'    => 'stabilization-action',
             'icon'        => '',
             'image'       => (string) get_the_post_thumbnail_url( $post_id, 'large' ),
+            'image_thumb' => (string) get_the_post_thumbnail_url( $post_id, 'thumbnail' ),
             'button'      => array(
                 'url'  => $this->translator->url( get_permalink( $post_id ) ),
                 'text' => $this->translator->text( __( 'More info', 'innsight' ) ),
@@ -548,6 +557,7 @@ final class DataSource {
             'category'    => '',
             'icon'        => '',
             'image'       => (string) get_the_post_thumbnail_url( $post_id, 'large' ),
+            'image_thumb' => (string) get_the_post_thumbnail_url( $post_id, 'thumbnail' ),
             'button'      => array(
                 'url'  => $this->translator->url( get_permalink( $post_id ) ),
                 'text' => $this->translator->text( __( 'More info', 'innsight' ) ),

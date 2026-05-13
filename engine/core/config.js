@@ -76,6 +76,9 @@
             category: poi.category || '',
             icon: poi.icon || '',
             image: poi.image || poi.img || '',
+            // Smaller variant for the 56px list sticker and 44px map pin.
+            // Falls back to the full-size image when no thumb was generated.
+            imageThumb: poi.imageThumb || poi.image_thumb || poi.image || poi.img || '',
             // Flat fields the design's bottom-sheet template references.
             rating: poi.rating != null ? Number(poi.rating) : null,
             dist: poi.dist || '',

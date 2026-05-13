@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.4.6 - 2026-05-12
+
+Five things in one batch.
+
+- **Sheet drag-down-to-close + no more pull-to-refresh.** Rewrote the
+  sheet gesture handler to coexist three modes decided on the first
+  move past 8px: horizontal swipe (prev/next POI), vertical drag down
+  from the top zone (close), native scroll below the top zone. Past 110px
+  the sheet closes; otherwise it snaps back. While the sheet is open the
+  document body gets `body.innsight-sheet-locked` which disables overflow
+  and overscroll - kills iOS Safari + Chrome Android pull-to-refresh
+  inside the sheet.
+- **Sort dropdown on the list.** "SORTED BY" now opens a small menu
+  (Nearest first / A → Z / Z → A). Picking one re-renders the list.
+- **"X km from base" on list rows.** Haversine in JS against the
+  reference point: pinned POI first, then any type='hostel', then the
+  map center. Formatted as `240 m` under 1 km, `1.2 km` under 10 km,
+  `15 km` above. The reference POI itself doesn't show the label.
+- **Thumbnail image variant.** DataSource emits `image_thumb`
+  (WordPress's `thumbnail` size) for every POI source alongside `image`
+  (`medium`/`large`). JsonBuilder exposes both. The list sticker + map
+  pin templates now use `imageThumb`; the sheet hero stays on the
+  full-size `image`. Cuts list-view bandwidth dramatically once WP has
+  the smaller intermediate generated. Falls back to the full size when
+  no thumbnail was generated.
+- **Live location with a pulsing 🎒.** New Settings -> Innsight options
+  ("Show user's live location" + "Live location icon", default 🎒).
+  Engine emits config.ui.liveLocation; the skin asks `navigator.geolocation.watchPosition`,
+  drops a 44px pulsing marker (accent halo + ink-bordered core with the
+  configured icon), and recenters the map on the first fix only.
+  Subsequent fixes just move the dot.
+
+Other small wins included: search box bg forced white now also stays
+white when focused; list row image gets `decoding="async"` for slightly
+faster paint.
+
 ## 0.4.5 - 2026-05-12
 
 Visual + UX batch:

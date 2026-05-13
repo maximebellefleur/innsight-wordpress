@@ -103,6 +103,8 @@ final class Admin {
         $this->add_field( 'render_mode', __( 'Render mode', 'innsight' ), 'innsight_render', 'render_render_mode' );
         $this->add_field( 'kml_export', __( 'Show KML download button', 'innsight' ), 'innsight_render', 'render_checkbox' );
         $this->add_field( 'solo_mode', __( 'Solo Mode toggle available', 'innsight' ), 'innsight_render', 'render_checkbox' );
+        $this->add_field( 'live_location', __( 'Show user\'s live location', 'innsight' ), 'innsight_render', 'render_checkbox', __( 'Asks the browser for the user\'s coordinates and drops a pulsing marker on the map.', 'innsight' ) );
+        $this->add_field( 'live_location_icon', __( 'Live location icon', 'innsight' ), 'innsight_render', 'render_text', __( 'Single character (emoji works best). Default: 🎒. Leave empty for a colored dot.', 'innsight' ) );
 
         $this->add_field( 'geocoder_email', __( 'Nominatim contact email', 'innsight' ), 'innsight_geocoder', 'render_text', __( 'Sent in the User-Agent header per Nominatim usage policy.', 'innsight' ) );
         $this->add_field( 'geocoder_cache_hours', __( 'Geocoder cache TTL (hours)', 'innsight' ), 'innsight_geocoder', 'render_number' );

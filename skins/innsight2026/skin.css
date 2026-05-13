@@ -383,6 +383,11 @@
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.18);
     max-height: 78vh;
     overflow-y: auto;
+    /* Contain prevents iOS overscroll bounce from reaching the page; pan-y
+     * lets the sheet content scroll natively while our JS handles the
+     * top-zone drag-to-close gesture. */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     transform: translateX(0);
     transition: transform 280ms cubic-bezier(.32, .72, .2, 1), opacity 220ms;
@@ -397,6 +402,9 @@
     opacity: 0.18;
     margin: 4px auto 14px;
     cursor: pointer;
+    /* Claim the pointer gesture entirely so iOS / Chrome Android don't
+     * try to interpret a downward drag as pull-to-refresh. */
+    touch-action: none;
 }
 
 /* Sheet nav row (prev / counter / next) */
@@ -881,4 +889,103 @@
     background: var(--in-accent);
     color: var(--in-ink);
     border-color: var(--in-ink);
+}
+
+/* Lock the host page while the bottom sheet is open. This prevents iOS
+ * Safari and Chrome Android from interpreting a downward drag inside the
+ * sheet as a pull-to-refresh gesture on the WordPress page below. */
+body.innsight-sheet-locked {
+    overflow: hidden;
+    overscroll-behavior-y: contain;
+    touch-action: pan-x pan-y;
+}
+
+/* Also nuke pull-to-refresh on the sheet nav row - the row is in the top
+ * gesture zone and dragging from there should close the sheet, never
+ * scroll the page. */
+.in-sheet__nav { touch-action: none; }
+
+/* Sort dropdown trigger + menu (list view header). */
+.in-list__sort { position: relative; }
+.in-list__sortvalue {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    color: var(--in-ink);
+    text-decoration: underline var(--in-accent) 3px;
+    text-underline-offset: 3px;
+}
+.in-list__sortmenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+    background: #fff;
+    border: 1.5px solid var(--in-ink);
+    border-radius: 14px;
+    box-shadow: 3px 3px 0 var(--in-ink);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+    z-index: 80;
+}
+.in-list__sortmenu[hidden] { display: none; }
+.in-list__sortmenu button {
+    background: transparent;
+    border: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: var(--in-ink);
+    font-size: 13px;
+}
+.in-list__sortmenu button:hover { background: var(--in-bg); }
+
+/* "X km from base" meta on list rows. */
+.in-row__hostel {
+    font-size: 10.5px;
+    color: var(--in-mute);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Live location pulse marker ──────────────────────────────────────────── */
+.in-livedot {
+    position: relative;
+    width: 44px; height: 44px;
+    pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 35;
+}
+.in-livedot__pulse {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: var(--in-accent);
+    opacity: 0.35;
+    animation: in-livedot-pulse 2s ease-in-out infinite;
+}
+.in-livedot__core {
+    position: relative;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--in-accent);
+    border: 2px solid var(--in-ink);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; line-height: 1;
+    /* Emoji-safe centering: emoji fonts have inconsistent metrics. */
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', system-ui;
+}
+@keyframes in-livedot-pulse {
+    0%, 100% { transform: scale(1);   opacity: 0.35; }
+    50%      { transform: scale(1.7); opacity: 0;    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .in-livedot__pulse { animation: none !important; opacity: 0.2; }
 }

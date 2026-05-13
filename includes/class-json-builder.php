@@ -85,6 +85,10 @@ final class JsonBuilder {
             'ui'           => array(
                 'kmlExport'    => ! empty( $settings['kml_export'] ),
                 'layerControl' => array( 'position' => 'bottomright', 'collapsed' => false ),
+                'liveLocation' => array(
+                    'enabled' => ! empty( $settings['live_location'] ),
+                    'icon'    => (string) ( $settings['live_location_icon'] ?? '🎒' ),
+                ),
             ),
             'pois'         => array_map( array( $this, 'shape_poi' ), $intermediate['pois'] ),
             'paths'        => array_map( array( $this, 'shape_path' ), $intermediate['paths'] ),
@@ -189,7 +193,11 @@ final class JsonBuilder {
             'cat'           => isset( $poi['cat'] ) ? (string) $poi['cat'] : '',
             'category'      => isset( $poi['category'] ) ? (string) $poi['category'] : '',
             'icon'          => isset( $poi['icon'] ) ? (string) $poi['icon'] : '',
+            // `image` = medium (sheet hero); `imageThumb` = thumbnail (list
+            // sticker + pin). Cuts list-view bandwidth dramatically when WP
+            // has generated the smaller intermediate size.
             'image'         => isset( $poi['image'] ) ? (string) $poi['image'] : '',
+            'imageThumb'    => isset( $poi['image_thumb'] ) ? (string) $poi['image_thumb'] : ( isset( $poi['image'] ) ? (string) $poi['image'] : '' ),
             'button'        => array(
                 'url'  => isset( $poi['button']['url'] ) ? (string) $poi['button']['url'] : '',
                 'text' => isset( $poi['button']['text'] ) ? (string) $poi['button']['text'] : '',
