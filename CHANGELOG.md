@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.8 - 2026-05-12
+
+- **Fullscreen now fullscreens the .in-app element only**, not the host
+  document. Previously the JS requested `requestFullscreen()` on the top
+  document so the entire WordPress page (theme header, footer, sidebar)
+  went into the FS view. Now only the Innsight UI fills the viewport;
+  the WP page is hidden behind it. All chrome (search, chips, sheet,
+  tab bar) remains visible and interactive in fullscreen.
+  - CSS: added `.in-app:fullscreen` / `:-webkit-full-screen` pseudo-class
+    rules forcing 100vw × 100vh with no max constraints.
+  - JS: removed the `is-fullscreen` class chrome-hiding rules; the class
+    is now just a state marker.
+  - JS: listens to `fullscreenchange` so pressing Escape syncs the
+    local fullscreen flag (button press will then re-enter cleanly).
+- **Geolocation prompt is country-gated.** New Settings field "Allowed
+  countries" (default: `CH`). The plugin reads the visitor's country
+  from the CDN-provided header on every shortcode render
+  (`CF-IPCountry`, `X-Country-Code`, `X-Geo-Country`,
+  `GEOIP_COUNTRY_CODE`, `Cloudfront-Viewer-Country`) and emits
+  `ui.liveLocation.allowed = true|false` in the JSON. The skin only
+  calls `navigator.geolocation.watchPosition` when allowed.
+  - Privacy default: when the allowlist is non-empty AND no header
+    detected, we DO NOT prompt (strict).
+  - Empty allowlist = always prompt (no gating).
+  - Filter `innsight/visitor_country` lets sites plug in their own
+    detection (MaxMind, ipapi, hardcoded for staging).
+
 ## 0.4.7 - 2026-05-12
 
 Google Places enrichment, on-demand only.

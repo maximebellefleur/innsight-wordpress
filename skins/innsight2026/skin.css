@@ -142,12 +142,23 @@
     display: none;
 }
 
-/* Fullscreen mode: hide top chrome, show wordmark pill, reposition controls. */
-.in-app.is-fullscreen .in-chrome,
-.in-app.is-fullscreen .in-tabs,
-.in-app.is-fullscreen .in-nearby { display: none; }
-.in-app.is-fullscreen .in-wordmark-pill { display: inline-block; }
-.in-app.is-fullscreen .in-mapctl { top: 78px; }
+/* Browser-native fullscreen on the .in-app element. The browser hides the
+ * host page (WP header, footer, chrome) behind the element; we make sure
+ * the in-app fills the device viewport with no spacing. The user keeps
+ * full access to chrome, chips, sheet, and tab bar inside the fullscreen
+ * view. */
+.in-app:fullscreen,
+.in-app:-webkit-full-screen {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    background: var(--in-bg);
+}
+
+/* The .is-fullscreen class is now just a state marker (set in JS so other
+ * code can react). No chrome is hidden - the user wants to keep search /
+ * chips / tab bar accessible while at viewport size. */
 
 /* ── Top chrome ──────────────────────────────────────────────────────────── */
 .in-chrome {

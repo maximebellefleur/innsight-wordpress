@@ -146,6 +146,7 @@
         this.bindTabs();
         this.bindSheetBackdrop();
         this.bindSortMenu();
+        this.bindFullscreenSync();
         this.bindEngineEvents();
         this.startLiveLocation();
         this.updateCounts();
@@ -168,6 +169,11 @@
     SkinController.prototype.startLiveLocation = function () {
         var liveCfg = (this.cfg.ui && this.cfg.ui.liveLocation) || {};
         if (!liveCfg.enabled) return;
+        // Country gate: the plugin computed `allowed` from the visitor's
+        // CDN country header against the admin's allowlist. If false, do
+        // NOT trigger the geolocation prompt - the visitor is outside the
+        // allowlist (or the detection was inconclusive on a strict list).
+        if (liveCfg.allowed === false) return;
         if (!root.navigator || !root.navigator.geolocation) return;
 
         var self = this;
@@ -376,16 +382,14 @@
         this.fullscreen = !this.fullscreen;
         this.app.classList.toggle('is-fullscreen', this.fullscreen);
 
-        // Real Fullscreen API. When the shortcode renders inside a
-        // page-builder iframe (Elementor / Divi / etc.), the CSS-only
-        // fullscreen only fills the iframe rect, not the device viewport.
-        // Try the browser's Fullscreen API on the top document so the page
-        // escapes the iframe. Cross-origin iframes throw on access; we
-        // catch and fall back to CSS-only.
+        // Fullscreen ONLY the .in-app element. The browser hides the host
+        // page (WP header, footer, content) behind it; the user sees the
+        // entire Innsight UI (chrome + map + chips + sheet + tab bar) at
+        // viewport size with no spacing. Previously we requested fullscreen
+        // on the top document which dragged the whole site into the FS view.
         try {
+            var el = this.app;
             var doc = root.document;
-            try { if (root.top && root.top.document) doc = root.top.document; } catch (e) {}
-            var el = doc.documentElement || doc.body;
             if (this.fullscreen) {
                 var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
                 if (req) req.call(el);
@@ -398,6 +402,26 @@
         // Map sometimes needs a resize after the chrome collapses.
         var p = this.state.provider;
         if (p && p.invalidateSize) setTimeout(function () { p.invalidateSize(); }, 240);
+    };
+
+    /* Sync local state when the user exits fullscreen via Escape (or the
+     * browser's own gesture). Without this the .is-fullscreen class would
+     * stay applied and the next click on the FS button would try to
+     * re-enter when we're already out. */
+    SkinController.prototype.bindFullscreenSync = function () {
+        var self = this;
+        var handler = function () {
+            var doc = root.document;
+            var inFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+            if (inFs !== self.fullscreen) {
+                self.fullscreen = inFs;
+                self.app.classList.toggle('is-fullscreen', inFs);
+                var p = self.state.provider;
+                if (p && p.invalidateSize) setTimeout(function () { p.invalidateSize(); }, 240);
+            }
+        };
+        document.addEventListener('fullscreenchange', handler);
+        document.addEventListener('webkitfullscreenchange', handler);
     };
 
     SkinController.prototype.nudgeZoom = function (dir) {

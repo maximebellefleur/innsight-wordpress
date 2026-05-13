@@ -85,10 +85,7 @@ final class JsonBuilder {
             'ui'           => array(
                 'kmlExport'    => ! empty( $settings['kml_export'] ),
                 'layerControl' => array( 'position' => 'bottomright', 'collapsed' => false ),
-                'liveLocation' => array(
-                    'enabled' => ! empty( $settings['live_location'] ),
-                    'icon'    => (string) ( $settings['live_location_icon'] ?? '🎒' ),
-                ),
+                'liveLocation' => $this->build_live_location_config( $settings ),
             ),
             'pois'         => array_map( array( $this, 'shape_poi' ), $intermediate['pois'] ),
             'paths'        => array_map( array( $this, 'shape_path' ), $intermediate['paths'] ),
@@ -144,6 +141,68 @@ final class JsonBuilder {
         }
 
         return $provider;
+    }
+
+    /**
+     * Build the live-location config block. Resolves whether this specific
+     * visitor's geolocation prompt should fire based on:
+     *   - the global enabled toggle
+     *   - the country allowlist + the CDN-provided country header
+     *
+     * Detection priority:
+     *   1. CF-IPCountry  (Cloudflare)
+     *   2. X-Country-Code / X-Geo-Country (other CDNs)
+     *   3. innsight/visitor_country filter (sites can plug their own
+     *      detection - MaxMind, ipapi, hardcoded for staging, etc.)
+     *
+     * Privacy default: when the allowlist is non-empty AND we cannot
+     * detect a country, we DO NOT prompt. Sites that need different
+     * behavior should hook the filter to return their own value.
+     */
+    private function build_live_location_config( array $settings ): array {
+        $enabled  = ! empty( $settings['live_location'] );
+        $icon     = (string) ( $settings['live_location_icon'] ?? '🎒' );
+        $allowlist = trim( (string) ( $settings['live_location_countries'] ?? '' ) );
+
+        $allowed = $enabled;
+        if ( $enabled && $allowlist !== '' ) {
+            $codes  = array_filter( array_map( 'trim', explode( ',', strtoupper( $allowlist ) ) ) );
+            $detected = $this->detect_visitor_country();
+            // Strict default: no detection + non-empty allowlist = no prompt.
+            $allowed = ( $detected !== '' && in_array( $detected, $codes, true ) );
+        }
+
+        return array(
+            'enabled'      => $enabled,
+            'allowed'      => (bool) $allowed,
+            'icon'         => $icon,
+            'allowlist'    => $allowlist,
+        );
+    }
+
+    private function detect_visitor_country(): string {
+        $candidates = array(
+            'HTTP_CF_IPCOUNTRY',     // Cloudflare
+            'HTTP_X_COUNTRY_CODE',   // generic CDN
+            'HTTP_X_GEO_COUNTRY',    // other CDNs
+            'GEOIP_COUNTRY_CODE',    // mod_geoip
+            'HTTP_CLOUDFRONT_VIEWER_COUNTRY', // AWS CloudFront
+        );
+        $detected = '';
+        foreach ( $candidates as $key ) {
+            if ( ! empty( $_SERVER[ $key ] ) ) {
+                $detected = strtoupper( substr( (string) $_SERVER[ $key ], 0, 2 ) );
+                if ( preg_match( '/^[A-Z]{2}$/', $detected ) ) break;
+                $detected = '';
+            }
+        }
+        /**
+         * Override / supply visitor country detection.
+         *
+         * @param string $detected 2-letter ISO code, or empty if undetected.
+         * @return string
+         */
+        return (string) apply_filters( 'innsight/visitor_country', $detected );
     }
 
     private function build_enrichment_config( array $settings ): array {

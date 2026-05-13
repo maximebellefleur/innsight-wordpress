@@ -58,6 +58,13 @@ final class Settings {
             // brand. Set to an empty string to render a colored dot instead.
             'live_location'        => 1,
             'live_location_icon'   => '🎒',
+            // Comma-separated ISO 3166-1 alpha-2 country codes. The
+            // geolocation prompt is only triggered when the visitor's
+            // detected country is in this list (default: just Switzerland).
+            // Empty = always prompt (no gating). Detection uses CDN headers
+            // (Cloudflare CF-IPCountry etc); when no header is present and
+            // the list is non-empty we DON'T prompt (privacy default).
+            'live_location_countries' => 'CH',
 
             // Geocoder.
             'geocoder_email'       => '',                   // Sent in Nominatim User-Agent (politeness header).
@@ -108,6 +115,13 @@ final class Settings {
         if ( strlen( $clean['live_location_icon'] ) > 16 ) {
             $clean['live_location_icon'] = mb_substr( $clean['live_location_icon'], 0, 4 );
         }
+        // Country allowlist: normalize to comma-separated, uppercase,
+        // 2-letter codes only. Spaces, lowercase, semicolons all accepted
+        // on input.
+        $countries_raw = isset( $raw['live_location_countries'] ) ? (string) $raw['live_location_countries'] : '';
+        $codes = preg_split( '/[\s,;]+/', strtoupper( $countries_raw ) ) ?: array();
+        $codes = array_filter( $codes, static function ( $c ) { return preg_match( '/^[A-Z]{2}$/', $c ); } );
+        $clean['live_location_countries'] = implode( ',', array_unique( $codes ) );
         $clean['geocoder_email']       = isset( $raw['geocoder_email'] ) ? sanitize_email( $raw['geocoder_email'] ) : '';
         $clean['geocoder_cache_hours'] = isset( $raw['geocoder_cache_hours'] ) ? max( 1, (int) $raw['geocoder_cache_hours'] ) : $defaults['geocoder_cache_hours'];
         $clean['render_mode']          = in_array( $raw['render_mode'] ?? '', array( 'inline', 'fetch' ), true ) ? $raw['render_mode'] : 'inline';
