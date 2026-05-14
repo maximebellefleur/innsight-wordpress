@@ -1,4 +1,22 @@
 # Changelog
+## 0.5.12 - 2026-05-14
+
+- **"More info" replaces "Directions"** as the sheet's fallback
+  primary action when a POI has no custom `button.url`. Tap opens a
+  scrollable "Featured in" popover showing every blog post / activity
+  / event that references this POI via the legacy
+  `maps_existing_act_marker_id` ACF repeater. Max 3 rows visible
+  before scroll. Empty state: "No related pages yet."
+- **DataSource builds a reverse-index** in one query (cached 5 min in
+  a transient) so the per-POI lookup is O(1) regardless of how many
+  POIs the page renders. Current page excluded from each list (visitor
+  is already there).
+- **Hover state on every primary button** (sheet primary action,
+  Saved-tab Share, receive popup Save-them-all) now swaps to
+  **accent bg + ink text** instead of the default dark bg with
+  invisible text. Theme overrides like `a:hover { background: #fff }`
+  can no longer wash out the white label.
+
 ## 0.5.11 - 2026-05-14
 
 Slow-network race fix + theme-overlay z-index + visible boot errors.

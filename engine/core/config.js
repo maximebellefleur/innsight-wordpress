@@ -88,7 +88,10 @@
             blurb: poi.blurb || poi.description || '',
             button: { url: btn.url || '', text: btn.text || '' },
             pinned: !!poi.pinned,
-            googlePlaceId: poi.googlePlaceId || poi.google_place_id || ''
+            googlePlaceId: poi.googlePlaceId || poi.google_place_id || '',
+            // Posts that reference this POI - source for the sheet's
+            // "Featured in" popover under the More-info button.
+            referencedBy: Array.isArray(poi.referencedBy) ? poi.referencedBy : []
         };
     }
 

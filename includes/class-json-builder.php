@@ -290,6 +290,17 @@ final class JsonBuilder {
             ),
             'pinned'        => ! empty( $poi['pinned'] ),
             'googlePlaceId' => isset( $poi['googlePlaceId'] ) ? (string) $poi['googlePlaceId'] : '',
+            // Posts that reference this POI via the legacy
+            // maps_existing_act_marker_id ACF repeater. Surfaces in the
+            // sheet's "Featured in" popover under the More-info button.
+            'referencedBy'  => isset( $poi['referencedBy'] ) && is_array( $poi['referencedBy'] )
+                ? array_values( array_map( static function ( $r ) {
+                    return array(
+                        'title' => isset( $r['title'] ) ? (string) $r['title'] : '',
+                        'url'   => isset( $r['url'] )   ? (string) $r['url']   : '',
+                    );
+                }, $poi['referencedBy'] ) )
+                : array(),
         );
     }
 

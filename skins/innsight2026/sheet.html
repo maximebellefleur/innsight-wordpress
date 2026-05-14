@@ -56,10 +56,18 @@
 </button>
 {{/if}}
 
+<div class="in-sheet__refs" data-innsight-sheet-refs hidden>
+    <div class="in-sheet__refs-head">Featured in</div>
+    <ul class="in-sheet__refs-list">
+        {{#each referencedBy}}<li><a href="{{url}}" target="_blank" rel="noopener">{{title}}</a></li>{{/each}}
+        {{#unless referencedBy}}<li class="in-sheet__refs-empty">No related pages yet.</li>{{/unless}}
+    </ul>
+</div>
+
 <div class="in-sheet__actions">
     <button class="in-sheet__act" data-innsight-sheet-save>Save</button>
     {{#if button.url}}<a class="in-sheet__act in-sheet__act--primary" href="{{button.url}}" target="_blank" rel="noopener">{{button.text}}</a>{{/if}}
-    {{#unless button.url}}<button class="in-sheet__act in-sheet__act--primary" data-innsight-sheet-directions>Directions</button>{{/unless}}
+    {{#unless button.url}}<button class="in-sheet__act in-sheet__act--primary" data-innsight-more-info>More info</button>{{/unless}}
 </div>
 
 {{#if googleMapsUri}}

@@ -635,6 +635,62 @@
     word-break: break-word;
 }
 
+/* "Featured in" popover - the scrollable list of posts that reference
+ * this POI, revealed by tapping More info. Sits ABOVE the actions row
+ * with a max-height = ~3 items so longer lists scroll inside. Bg is
+ * surface white over the sheet's cream so it reads as a distinct
+ * floating panel. */
+.in-sheet__refs {
+    background: #ffffff;
+    border: 1.5px solid var(--in-ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--in-ink);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    animation: in-refs-pop 220ms cubic-bezier(.32, .72, .2, 1) backwards;
+}
+.in-sheet__refs[hidden] { display: none; }
+.in-sheet__refs-head {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--in-mute);
+    margin-bottom: 6px;
+}
+.in-sheet__refs-list {
+    list-style: none;
+    margin: 0; padding: 0;
+    /* ~3 rows visible (38px each) before scroll kicks in. */
+    max-height: 132px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+.in-sheet__refs-list li {
+    border-bottom: 1px dashed var(--in-divider-dashed);
+}
+.in-sheet__refs-list li:last-child { border-bottom: 0; }
+.in-sheet__refs-list a {
+    display: block;
+    padding: 9px 4px;
+    color: var(--in-ink) !important;
+    text-decoration: none !important;
+    font-size: 14px;
+    line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.in-sheet__refs-list a:hover { color: var(--in-ink) !important; background: var(--in-bg); border-radius: 6px; }
+.in-sheet__refs-empty {
+    padding: 9px 4px;
+    color: var(--in-mute);
+    font-style: italic;
+    font-size: 13px;
+}
+@keyframes in-refs-pop {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+}
+
 /* Sheet actions */
 .in-sheet__actions {
     display: flex; gap: 10px;
@@ -666,8 +722,6 @@
 }
 .in-sheet__act--primary,
 .in-sheet__act--primary:visited,
-.in-sheet__act--primary:hover,
-.in-sheet__act--primary:focus,
 .in-sheet__act--primary:active {
     /* Pure white text - cream (--in-bg) on ink reads too dim. Both
      * the <button> and <a> form get the same color. `!important`
@@ -675,6 +729,17 @@
      * colors and we end up with invisible text on a black pill. */
     background: var(--in-ink) !important;
     color: #ffffff !important;
+    border-color: var(--in-ink) !important;
+    text-decoration: none !important;
+}
+.in-sheet__act--primary:hover,
+.in-sheet__act--primary:focus {
+    /* On hover, swap to accent bg + ink text so the action is OBVIOUSLY
+     * interactable and the text never disappears (some themes set
+     * a:hover { background: #fff } which would white-out the white
+     * label). Accent + ink is unambiguous on every host theme. */
+    background: var(--in-accent) !important;
+    color: var(--in-ink) !important;
     border-color: var(--in-ink) !important;
     text-decoration: none !important;
 }
@@ -1434,7 +1499,13 @@ body.innsight-sheet-locked {
 }
 .in-saved__share span { color: inherit !important; }
 .in-saved__share svg  { color: inherit !important; }
-.in-saved__share:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--in-accent); }
+.in-saved__share:hover,
+.in-saved__share:focus {
+    background: var(--in-accent) !important;
+    color: var(--in-ink) !important;
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--in-ink);
+}
 .in-saved__share[hidden] { display: none; }
 
 /* ── v0.5.0 - Share menu (bottom sheet with channel tiles) ──────────────── */
@@ -1613,19 +1684,22 @@ body.innsight-sheet-locked {
 }
 .in-receive__btn--primary,
 .in-receive__btn--primary:visited,
-.in-receive__btn--primary:hover,
-.in-receive__btn--primary:focus,
 .in-receive__btn--primary:active {
     background: var(--in-ink) !important;
     color: #ffffff !important;
     border-color: var(--in-ink) !important;
     box-shadow: 2px 2px 0 var(--in-accent);
 }
-.in-receive__btn--primary:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--in-accent); }
+.in-receive__btn--primary:hover,
+.in-receive__btn--primary:focus {
+    background: var(--in-accent) !important;
+    color: var(--in-ink) !important;
+    border-color: var(--in-ink) !important;
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--in-ink);
+}
 .in-receive__btn,
-.in-receive__btn:visited,
-.in-receive__btn:hover,
-.in-receive__btn:focus {
+.in-receive__btn:visited {
     color: var(--in-ink) !important;
     border-color: var(--in-ink) !important;
 }

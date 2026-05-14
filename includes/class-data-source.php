@@ -91,6 +91,12 @@ final class DataSource {
 
         $pois = $this->dedupe_pois( $pois );
 
+        // Reverse-index: for every POI in our list, find blog posts /
+        // activities / events that reference it via the legacy
+        // `maps_existing_act_marker_id` ACF repeater. Surfaces as the
+        // "Featured in" list under the sheet's More-info button.
+        $pois = $this->attach_referenced_by( $pois, $post_id );
+
         $branding = array(
             'logoUrl' => $this->resolve_logo_url(),
         );
@@ -616,5 +622,98 @@ final class DataSource {
             $out[]        = $poi;
         }
         return $out;
+    }
+
+    /**
+     * Walk every published post that has the legacy
+     * `maps_existing_act_marker_id` ACF repeater set and build a reverse
+     * map: poi_id -> [{title, url}, ...]. Then attach that list to
+     * matching POIs as `referencedBy`. Surfaces under the sheet's
+     * "More info" button as a scrollable "Featured in" list.
+     *
+     * The current page is excluded from the list (the visitor is
+     * already there). Posts with `_thumbnail_id` set get their
+     * featured image url too so a future popover variant can show
+     * thumbnails - the skin currently just renders the title.
+     *
+     * Cached in a 5-minute transient because the underlying meta
+     * query is the heaviest pull in this class. Cache key includes
+     * the current post id so the "exclude current page" filter is
+     * accurate.
+     *
+     * @param array<int,array> $pois
+     * @param int              $current_post_id
+     * @return array<int,array>
+     */
+    private function attach_referenced_by( array $pois, int $current_post_id ): array {
+        if ( empty( $pois ) ) {
+            return $pois;
+        }
+        $cache_key = 'innsight_refby_' . md5( wp_json_encode( wp_list_pluck( $pois, 'id' ) ) . '|' . $current_post_id );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) ) {
+            return $this->merge_referenced_by( $pois, $cached );
+        }
+
+        // Pull every post that has the meta key set. ACF stores the
+        // repeater rows in keys like
+        // `maps_existing_act_marker_id_0_act_marker_id`,
+        // `maps_existing_act_marker_id_1_act_marker_id`, etc, plus a
+        // count in `maps_existing_act_marker_id` itself. Querying
+        // `meta_key = maps_existing_act_marker_id` finds every post
+        // that has the repeater initialised; we then read the rows
+        // through innsight_get_field which handles the ACF unwrapping.
+        $q = new \WP_Query( array(
+            'post_type'              => 'any',
+            'post_status'            => 'publish',
+            'posts_per_page'         => -1,
+            'fields'                 => 'ids',
+            'no_found_rows'          => true,
+            'update_post_meta_cache' => true,
+            'update_post_term_cache' => false,
+            'meta_query'             => array(
+                array(
+                    'key'     => 'maps_existing_act_marker_id',
+                    'compare' => 'EXISTS',
+                ),
+            ),
+        ) );
+        $reverse = array();   // poi_id => [{title, url}]
+        foreach ( $q->posts as $referencing_post_id ) {
+            if ( (int) $referencing_post_id === $current_post_id ) continue;
+            $rows = innsight_get_field( 'maps_existing_act_marker_id', (int) $referencing_post_id );
+            if ( empty( $rows ) || ! is_array( $rows ) ) continue;
+            $title = (string) get_the_title( (int) $referencing_post_id );
+            $url   = (string) get_permalink( (int) $referencing_post_id );
+            if ( $title === '' || $url === '' ) continue;
+            foreach ( $rows as $row ) {
+                $marker_id = is_array( $row ) ? ( $row['act_marker_id'] ?? null ) : $row;
+                $marker_id = is_object( $marker_id ) ? (int) $marker_id->ID : (int) $marker_id;
+                if ( $marker_id <= 0 ) continue;
+                $key = (string) $marker_id;
+                if ( ! isset( $reverse[ $key ] ) ) $reverse[ $key ] = array();
+                $reverse[ $key ][] = array( 'title' => $title, 'url' => $url );
+            }
+        }
+        set_transient( $cache_key, $reverse, 5 * MINUTE_IN_SECONDS );
+        return $this->merge_referenced_by( $pois, $reverse );
+    }
+
+    /**
+     * Glue the reverse map onto each POI under `referencedBy`. Looks
+     * up by both POI id (raw and prefixed - portfolio post IDs come
+     * through as numeric, hostel/event come through as strings).
+     */
+    private function merge_referenced_by( array $pois, array $reverse ): array {
+        return array_map( static function ( $poi ) use ( $reverse ) {
+            $id = (string) ( $poi['id'] ?? '' );
+            $matches = $reverse[ $id ] ?? array();
+            // Also try the bare numeric id when ours is prefixed (e.g. "act-123" -> "123").
+            if ( empty( $matches ) && preg_match( '/(\d+)$/', $id, $m ) ) {
+                $matches = $reverse[ $m[1] ] ?? array();
+            }
+            $poi['referencedBy'] = $matches;
+            return $poi;
+        }, $pois );
     }
 }

@@ -865,6 +865,25 @@
         if (notePreview) {
             notePreview.addEventListener('click', function () { self.openNotesPanel(); });
         }
+        // "More info" toggles a Featured-in popover above the actions.
+        // The popover is rendered hidden in sheet.html and revealed by
+        // dropping the [hidden] attribute. Tapping outside closes it.
+        var moreInfoBtn = inner.querySelector('[data-innsight-more-info]');
+        var refsBlock   = inner.querySelector('[data-innsight-sheet-refs]');
+        if (moreInfoBtn && refsBlock) {
+            moreInfoBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (refsBlock.hasAttribute('hidden')) refsBlock.removeAttribute('hidden');
+                else refsBlock.setAttribute('hidden', '');
+            });
+            // Outside-click close: bound on the inner once per render.
+            inner.addEventListener('click', function (e) {
+                if (refsBlock.hasAttribute('hidden')) return;
+                if (e.target === moreInfoBtn || moreInfoBtn.contains(e.target)) return;
+                if (e.target === refsBlock || refsBlock.contains(e.target)) return;
+                refsBlock.setAttribute('hidden', '');
+            });
+        }
         // Bind swipe.
         this.bindSheetSwipe(inner);
         // Bind the personal-note pull-up. Needs the freshly-rendered DOM
@@ -1049,6 +1068,9 @@
         // actions when this is set; tap opens the full notes editor.
         ctx.noteText = this.getNote(poi.id) || poi.note || '';
         ctx.hasNote = !!ctx.noteText;
+        // Posts that reference this POI - drives the "Featured in"
+        // popover under the More-info button.
+        ctx.referencedBy = Array.isArray(poi.referencedBy) ? poi.referencedBy : [];
         // Stash for navigation.
         this.sheet.siblings = siblings;
         this.sheet.idx = idx;
