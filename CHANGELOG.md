@@ -1,4 +1,21 @@
 # Changelog
+## 0.5.7 - 2026-05-14
+
+- **Share links survive WhatsApp / iMessage / SMS auto-linking.**
+  WhatsApp's URL detector truncates at `=` (and a few other special
+  characters), so the recipient was clicking on a link that ended at
+  `…/?innsight_share` with the token chopped off. The share URL now
+  uses a hash fragment with `/` as the separator instead of a query
+  parameter with `=`:
+
+  Before: `https://site.com/page/?innsight_share=<base64token>`
+  After:  `https://site.com/page/#innsight_share/<base64token>`
+
+  Nothing after `#` is "special" to messenger URL detection and `/`
+  reads as part of the path, so the full link survives. `consumeShareUrl`
+  parses BOTH formats so any share links already in the wild keep
+  working.
+
 ## 0.5.6 - 2026-05-14
 
 - **Wordmark prefix (client name).** New Settings → Design field

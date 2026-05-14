@@ -1653,8 +1653,15 @@
         var saved = this.readSavedList();
         var token = this.encodeSharedPicks(saved);
         if (!token) return '';
-        var base = root.location.origin + root.location.pathname;
-        return base + (root.location.pathname.indexOf('?') >= 0 ? '&' : '?') + SHARE_PARAM + '=' + token;
+        var base = root.location.origin + root.location.pathname + root.location.search;
+        // Use a hash fragment with `/` as the separator (NOT `?param=value`).
+        // WhatsApp / iMessage / SMS auto-link detectors truncate URLs at
+        // `=` and several other URL-special characters, so the recipient
+        // would see the link end at `…/?innsight_share` with the token
+        // chopped off. A hash fragment + slash separator survives every
+        // messenger we've tested: nothing after `#` is "special" to URL
+        // detection, and `/` reads as part of the path.
+        return base + '#' + SHARE_PARAM + '/' + token;
     };
 
     SkinController.prototype.shareConfig = function () {
@@ -1793,19 +1800,35 @@
 
     SkinController.prototype.consumeShareUrl = function () {
         try {
-            var qs = root.location.search || '';
-            var match = qs.match(new RegExp('[?&]' + SHARE_PARAM + '=([^&]+)'));
-            if (!match) return;
-            var picks = this.decodeSharedPicks(decodeURIComponent(match[1]));
+            var hash = root.location.hash || '';
+            var qs   = root.location.search || '';
+            var token = '';
+            // Preferred: hash fragment with `/` separator (WhatsApp-safe).
+            //   #innsight_share/<base64url>
+            var hashMatch = hash.match(new RegExp('[#&]' + SHARE_PARAM + '/([^&#]+)'));
+            if (hashMatch) {
+                token = hashMatch[1];
+            } else {
+                // Legacy: query parameter (still respected so old links work).
+                //   ?innsight_share=<base64url>
+                var qsMatch = qs.match(new RegExp('[?&]' + SHARE_PARAM + '=([^&]+)'));
+                if (qsMatch) token = qsMatch[1];
+            }
+            if (!token) return;
+            var picks = this.decodeSharedPicks(decodeURIComponent(token));
             if (!picks || !picks.length) return;
             // Stash for the session so the dancing chip survives navigation
             // between tabs (but not a full new tab open).
             try { root.sessionStorage.setItem(SHARED_PICKS_KEY, JSON.stringify(picks)); } catch (e) {}
             this.showReceivePopup(picks);
-            // Clean the URL so a manual reload doesn't re-pop the modal.
+            // Clean both URL forms so a manual reload doesn't re-pop the
+            // modal. history.replaceState gives a tidy URL without a
+            // network round-trip.
             if (root.history && root.history.replaceState) {
-                var clean = qs.replace(new RegExp('([?&])' + SHARE_PARAM + '=[^&]+&?'), '$1').replace(/[?&]$/, '');
-                root.history.replaceState({}, '', root.location.pathname + clean + root.location.hash);
+                var cleanQs = qs.replace(new RegExp('([?&])' + SHARE_PARAM + '=[^&]+&?'), '$1').replace(/[?&]$/, '');
+                var cleanHash = hash.replace(new RegExp('[#&]' + SHARE_PARAM + '/[^&]+'), '');
+                if (cleanHash === '#') cleanHash = '';
+                root.history.replaceState({}, '', root.location.pathname + cleanQs + cleanHash);
             }
         } catch (e) {}
     };
