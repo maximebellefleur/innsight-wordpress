@@ -79,6 +79,9 @@ final class JsonBuilder {
                     'bleu'  => '#1a73e8',
                 ),
                 'logoUrl' => isset( $intermediate['branding']['logoUrl'] ) ? (string) $intermediate['branding']['logoUrl'] : '',
+                // Client-name prefix (e.g. "Balmers"). Skin rewrites each
+                // .in-wordmark element to "<prefix> → Innsight." when set.
+                'wordmarkPrefix' => (string) ( $settings['wordmark_prefix'] ?? '' ),
             ),
             'actionLinks'  => $this->default_action_links(),
             'categories'   => $this->build_categories( $skin_name, $intermediate['pois'] ),

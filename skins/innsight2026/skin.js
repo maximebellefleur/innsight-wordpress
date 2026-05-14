@@ -151,6 +151,7 @@
         this.checkVersion();
 
         this.applyBranding();
+        this.applyWordmark();
         this.renderChips();
         this.bindChrome();
         this.bindMapControls();
@@ -415,6 +416,38 @@
         if (colors.accent) styles.push('--in-accent:' + colors.accent);
         if (b.sheetBg)     styles.push('--in-sheet:'  + b.sheetBg);
         if (styles.length) this.app.setAttribute('style', (this.app.getAttribute('style') || '') + ';' + styles.join(';'));
+    };
+
+    /**
+     * Rewrite every `.in-wordmark` element (chrome header, list view,
+     * saved view) when an admin-supplied `branding.wordmarkPrefix` is
+     * set. The output looks like:
+     *
+     *   <div class="in-wordmark">
+     *       Balmers <span class="innsight-mode-header">→ Innsight</span><span class="in-accent-dot">.</span>
+     *   </div>
+     *
+     * If no prefix is set we leave the original markup ("Innsight" plus
+     * accent dot) untouched. Plain-text only - the prefix is escaped via
+     * textContent so admins can't inject HTML through the field.
+     */
+    SkinController.prototype.applyWordmark = function () {
+        var prefix = ((this.cfg.branding && this.cfg.branding.wordmarkPrefix) || '').toString().trim();
+        if (!prefix) return;
+        var marks = this.target.querySelectorAll('.in-wordmark');
+        for (var i = 0; i < marks.length; i++) {
+            var dot = marks[i].querySelector('.in-accent-dot');
+            // Wipe existing content, rebuild: "<prefix> <span>→ Innsight</span><span>.</span>"
+            marks[i].textContent = prefix + ' ';
+            var modeSpan = document.createElement('span');
+            modeSpan.className = 'innsight-mode-header';
+            modeSpan.textContent = '→ Innsight';   // → Innsight
+            marks[i].appendChild(modeSpan);
+            var dotSpan = document.createElement('span');
+            dotSpan.className = 'in-accent-dot';
+            dotSpan.textContent = '.';
+            marks[i].appendChild(dotSpan);
+        }
     };
 
     /* ── Chips ────────────────────────────────────────────────────────────── */

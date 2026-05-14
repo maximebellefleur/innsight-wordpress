@@ -74,6 +74,12 @@ final class Settings {
             // or 'fetch' (engine fetches /wp-json/innsight/v1/map).
             'render_mode'          => 'inline',
 
+            // Wordmark prefix (e.g. "Balmers") shown before "→ Innsight"
+            // in the header / list / saved view wordmarks. Empty = render
+            // just "Innsight" as before. Plain text only; the skin injects
+            // it through DOM rewrites so HTML in the value is escaped.
+            'wordmark_prefix'      => '',
+
             // Share-wishlist feature (innsight2026 only). When enabled, the
             // Saved tab gets a top-right Share button that lets the visitor
             // ship their saved list as a tokenized URL. The recipient sees
@@ -138,6 +144,10 @@ final class Settings {
         $clean['geocoder_email']       = isset( $raw['geocoder_email'] ) ? sanitize_email( $raw['geocoder_email'] ) : '';
         $clean['geocoder_cache_hours'] = isset( $raw['geocoder_cache_hours'] ) ? max( 1, (int) $raw['geocoder_cache_hours'] ) : $defaults['geocoder_cache_hours'];
         $clean['render_mode']          = in_array( $raw['render_mode'] ?? '', array( 'inline', 'fetch' ), true ) ? $raw['render_mode'] : 'inline';
+        // Wordmark prefix: plain text, strip tags, cap at 40 chars so a
+        // long brand doesn't overflow the chrome row.
+        $wm = isset( $raw['wordmark_prefix'] ) ? wp_strip_all_tags( (string) $raw['wordmark_prefix'] ) : '';
+        $clean['wordmark_prefix']      = mb_substr( trim( $wm ), 0, 40 );
 
         // Share-wishlist copy. Plain-text fields the recipient sees in the
         // receive popup + the dancing chip label. Stripped to avoid HTML

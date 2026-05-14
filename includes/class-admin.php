@@ -92,6 +92,8 @@ final class Admin {
 
         $this->add_field( 'skin_name', __( 'Design', 'innsight' ), 'innsight_design', 'render_skin_radio',
             __( 'Choose which skin renders the map. The new 2026 design needs a Mapbox access token (see below).', 'innsight' ) );
+        $this->add_field( 'wordmark_prefix', __( 'Wordmark prefix (client name)', 'innsight' ), 'innsight_design', 'render_text',
+            __( 'Shown before "→ Innsight" in the header/list/saved view wordmarks. Example: "Balmers" renders as "Balmers → Innsight". Leave empty for plain "Innsight".', 'innsight' ) );
 
         $this->add_field( 'provider_default', __( 'Default provider', 'innsight' ), 'innsight_provider', 'render_provider_default' );
         $this->add_field( 'mapbox_access_token', __( 'Mapbox access token', 'innsight' ), 'innsight_provider', 'render_text' );

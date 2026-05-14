@@ -1,4 +1,20 @@
 # Changelog
+## 0.5.6 - 2026-05-14
+
+- **Wordmark prefix (client name).** New Settings → Design field
+  "Wordmark prefix (client name)". When set (e.g. `Balmers`), every
+  `.in-wordmark` element (chrome header, list view, saved view) is
+  rewritten to:
+
+  `Balmers <span class="innsight-mode-header">→ Innsight</span><span class="in-accent-dot">.</span>`
+
+  The `.innsight-mode-header` chip renders at half size with the
+  accent background and the accent dot tucks under it (`margin-left:
+  -13px`). Empty prefix leaves the original "Innsight." wordmark
+  untouched. Prefix is escaped via `textContent` so admins can't
+  inject HTML through the field; capped at 40 characters in
+  sanitize.
+
 ## 0.5.5 - 2026-05-14
 
 Theme-hardening + layout fix.

@@ -194,6 +194,22 @@
     font-style: normal;
     font-weight: 700;
 }
+/* Client-name wordmark variant. When the admin sets a "Wordmark prefix"
+ * (e.g. "Balmers"), the skin rewrites .in-wordmark to:
+ *   "Balmers <span class="innsight-mode-header">→ Innsight</span><span class="in-accent-dot">.</span>"
+ * The mode-header pill renders the "→ Innsight" tag at half size with
+ * a yellow-green chip background; the accent dot tucks under the chip
+ * so the trailing period reads as part of the chip footprint. */
+.in-wordmark span.innsight-mode-header {
+    font-size: .5em;
+    color: #333;
+    background: var(--in-accent);
+    padding: 2px 15px 2px 3px;
+}
+.in-wordmark span.innsight-mode-header + .in-accent-dot {
+    margin-left: -13px;
+    color: #a3c540;
+}
 .in-profile {
     width: 40px; height: 40px;
     border-radius: 50%;
