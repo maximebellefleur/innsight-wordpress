@@ -1,4 +1,38 @@
 # Changelog
+## 0.5.9 - 2026-05-14
+
+WhatsApp Desktop URL fix.
+
+### Why share links broke
+
+WhatsApp Desktop visually wraps long URLs onto multiple lines but
+only the first line stays clickable - the recipient's tap takes them
+to `…/#innsight_share/` with the base64 token chopped off. Mobile
+WhatsApp handles this better, but the fix had to be the same: ship a
+shorter URL.
+
+### What changed
+
+- **Share token slimmed by ~80%.** We now encode only what the
+  recipient can't reconstruct: `[id, title, cat, lat, lon, note]` per
+  POI as an array-of-arrays (no key names). Previously we shipped
+  image URL, thumbnail URL, rating, tag, button URL + text - all of
+  which the recipient's site already has cached locally for any POI
+  with a matching id. For 5 POIs the URL drops from ~3 KB to ~500
+  bytes.
+- **Live POI overlay in preview mode.** When the recipient is on the
+  same site as the sharer, `visiblePois` returns the live POI (with
+  full image/rating/button data) and shallow-copies in the friend's
+  note. So previewing on the same site looks visually identical to
+  browsing your own saved list.
+- **Backwards compatibility for old links.** `decodeSharedPicks`
+  detects the old object format `{i,t,c,...}` and converts it - links
+  shared from 0.5.7/0.5.8 keep working.
+- **WhatsApp length guard.** If the encoded URL exceeds 1800
+  characters (the WhatsApp Desktop wrap threshold), the WhatsApp tile
+  toasts "Wishlist too long for WhatsApp - use Copy link or Email"
+  instead of opening a doomed share. Other channels still work.
+
 ## 0.5.8 - 2026-05-14
 
 Personal notes are now first-class: they ride along with shares and

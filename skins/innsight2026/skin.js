@@ -631,14 +631,25 @@
             var liveById = {};
             for (var i = 0; i < pois.length; i++) liveById[ String(pois[i].id) ] = pois[i];
             return picks.map(function (p) {
-                return liveById[ String(p.id) ] || {
+                var live = liveById[ String(p.id) ];
+                if (live) {
+                    // Don't mutate the live POI - shallow-copy so we can
+                    // overlay the friend's note without affecting cfg.pois.
+                    if (!p.note) return live;
+                    var copy = {};
+                    for (var k in live) if (Object.prototype.hasOwnProperty.call(live, k)) copy[k] = live[k];
+                    copy.note = p.note;
+                    return copy;
+                }
+                return {
                     id: p.id, title: p.title, name: p.title,
                     cat: p.cat, type: p.type,
                     lat: p.lat, lon: p.lon,
-                    image: p.image, imageThumb: p.imageThumb,
-                    rating: p.rating, tag: p.tag,
+                    image: p.image || '', imageThumb: p.imageThumb || '',
+                    rating: p.rating, tag: p.tag || '',
                     button: p.button || { url: '', text: '' },
-                    open: true, __synthetic: true
+                    open: true, __synthetic: true,
+                    note: p.note || ''
                 };
             }).filter(function (p) {
                 return !q || (p.title || p.name || '').toLowerCase().indexOf(q) !== -1;
@@ -1614,32 +1625,32 @@
     var SHARED_PICKS_KEY = 'innsight.sharedPicks';   // sessionStorage
 
     /**
-     * Encode the user's saved POIs into a URL-safe base64 token. We carry
-     * a slim shape (id, title, lat/lon, image, cat/type, tag, button) so the
-     * recipient can preview every spot even when the POI ids don't exist on
-     * their site. Description/blurb deliberately omitted to keep the URL
-     * under typical messaging-app length caps.
+     * Encode the user's saved POIs into a URL-safe base64 token.
+     *
+     * Token shape is deliberately MINIMAL because messengers truncate
+     * long URLs (WhatsApp loses the click region somewhere around the
+     * 2-3kB mark). We only carry what the recipient can't reconstruct:
+     *   [id, title, cat, lat, lon, note]
+     * Image URL, thumbnail, rating, tag, button - all looked up from the
+     * recipient's live POI data when the id matches. If the recipient is
+     * on a different site / the POI no longer exists, the synthesized
+     * fallback uses the title + lat/lon + note we did encode.
+     *
+     * Format is array-of-arrays (not array-of-objects) to skip the key
+     * names entirely - saves ~30 bytes per POI.
      */
     SkinController.prototype.encodeSharedPicks = function (savedList) {
         if (!savedList || !savedList.length) return '';
         var self = this;
         var slim = savedList.map(function (e) {
-            return {
-                i:  e.id,
-                t:  e.title,
-                c:  e.cat || '',
-                ty: e.type || '',
-                la: Number(e.lat),
-                lo: Number(e.lon),
-                im: e.image || '',
-                th: e.imageThumb || e.image || '',
-                ra: e.rating != null ? Number(e.rating) : null,
-                tg: e.tag || '',
-                bu: e.button ? { u: e.button.url || '', x: e.button.text || '' } : null,
-                // Personal note (if any) so the recipient sees the
-                // friend's commentary in the sheet + list rows.
-                nt: self.getNote(e.id) || ''
-            };
+            return [
+                e.id,
+                e.title || '',
+                e.cat || e.type || '',
+                Number(e.lat),
+                Number(e.lon),
+                self.getNote(e.id) || ''
+            ];
         });
         try {
             var json = JSON.stringify(slim);
@@ -1657,11 +1668,28 @@
             var slim = JSON.parse(json);
             if (!Array.isArray(slim)) return null;
             return slim.map(function (e) {
+                // Tuple form: [id, title, cat, lat, lon, note]. Defensive
+                // against partial/old-format tokens that came through as
+                // {i,t,c,...} objects from pre-0.5.9 sharers.
+                if (Array.isArray(e)) {
+                    return {
+                        id:    e[0],
+                        title: e[1] || '',
+                        cat:   e[2] || '',
+                        type:  e[2] || '',
+                        lat:   Number(e[3]),
+                        lon:   Number(e[4]),
+                        note:  e[5] || '',
+                        image: '', imageThumb: '',
+                        rating: null, tag: '',
+                        button: { url: '', text: '' }
+                    };
+                }
                 return {
                     id: e.i, title: e.t, cat: e.c, type: e.ty,
                     lat: e.la, lon: e.lo,
-                    image: e.im, imageThumb: e.th,
-                    rating: e.ra, tag: e.tg,
+                    image: e.im || '', imageThumb: e.th || '',
+                    rating: e.ra != null ? e.ra : null, tag: e.tg || '',
                     button: e.bu ? { url: e.bu.u || '', text: e.bu.x || '' } : { url: '', text: '' },
                     note: e.nt || ''
                 };
@@ -1752,6 +1780,11 @@
      * Share API (fall back to copy on any failure); WhatsApp / Email /
      * Facebook open vendor URLs in a new tab; copy writes the link to the
      * clipboard with a toast confirmation.
+     *
+     * For WhatsApp specifically: WhatsApp Desktop wraps long URLs onto
+     * multiple visual lines and only the first line stays clickable, so
+     * we warn the user when the URL exceeds a safe length and route them
+     * toward Copy Link / Email instead.
      */
     SkinController.prototype.dispatchShare = function (channel) {
         var url = this.buildShareUrl();
@@ -1759,6 +1792,14 @@
         var msg = this.shareConfig().inviteMessage;
         var combined = msg + '\n\n' + url;
         var self = this;
+
+        // WhatsApp's clickable-URL line-wrap limit is roughly 2 KB on
+        // desktop; mobile fares better. Beyond that the recipient sees a
+        // truncated link with the token chopped off mid-base64.
+        if (channel === 'whatsapp' && url.length > 1800) {
+            this.showToast('Wishlist too long for WhatsApp - use Copy link or Email');
+            return;
+        }
 
         switch (channel) {
             case 'native':
