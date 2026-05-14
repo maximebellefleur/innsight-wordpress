@@ -807,6 +807,12 @@
             }
             saveBtn.addEventListener('click', function () { self.toggleSavedPoi(poi, saveBtn); });
         }
+        // Tap on the accent-coloured note preview opens the full notes
+        // editor. The preview is only rendered when the POI has a note.
+        var notePreview = inner.querySelector('[data-innsight-note-preview]');
+        if (notePreview) {
+            notePreview.addEventListener('click', function () { self.openNotesPanel(); });
+        }
         // Bind swipe.
         this.bindSheetSwipe(inner);
         // Bind the personal-note pull-up. Needs the freshly-rendered DOM
@@ -986,9 +992,11 @@
         // up live details…" status row + a placeholder rating chip while
         // this is on. Re-render on enrichment resolve clears it.
         ctx.enrichLoading = this.enrichmentPendingFor(poi);
-        // Existing personal-note flag - lets the peek label say "Your note"
-        // instead of the prompt when the user has already typed something.
-        ctx.hasNote = !!this.getNote(poi.id);
+        // Personal note (own or carried by a friend's shared pick). The
+        // template renders a clickable accent-coloured preview above the
+        // actions when this is set; tap opens the full notes editor.
+        ctx.noteText = this.getNote(poi.id) || poi.note || '';
+        ctx.hasNote = !!ctx.noteText;
         // Stash for navigation.
         this.sheet.siblings = siblings;
         this.sheet.idx = idx;
@@ -1187,6 +1195,11 @@
             // Prefer the smaller image variant for the 56px sticker. Falls
             // back to the full-size `image` if the plugin didn't ship one.
             var thumb = p.imageThumb || p.image || '';
+            // Note text: prefer the recipient's own saved note, fall back
+            // to a friend's-shared note carried on the synthesized POI
+            // (poi.note exists only when this row came from a preview-
+            // shared pick).
+            var note = self.getNote(p.id) || p.note || '';
             var ctx = {
                 id: p.id,
                 title: p.title || p.name || '',
@@ -1202,6 +1215,7 @@
                 rating: p.rating != null ? Number(p.rating).toFixed(1) : '',
                 open: p.open ? 'true' : 'false',
                 openShort: p.open ? 'Open' : 'Closed',
+                note: note,
                 __index: i
             };
             return Innsight._template.render(template, ctx);
@@ -1304,6 +1318,7 @@
                 rating:         entry.rating != null ? Number(entry.rating).toFixed(1) : '',
                 open:           '',
                 openShort:      '',
+                note:           self.getNote(entry.id) || '',
                 __index:        i
             });
         }).join('');
@@ -1607,6 +1622,7 @@
      */
     SkinController.prototype.encodeSharedPicks = function (savedList) {
         if (!savedList || !savedList.length) return '';
+        var self = this;
         var slim = savedList.map(function (e) {
             return {
                 i:  e.id,
@@ -1619,7 +1635,10 @@
                 th: e.imageThumb || e.image || '',
                 ra: e.rating != null ? Number(e.rating) : null,
                 tg: e.tag || '',
-                bu: e.button ? { u: e.button.url || '', x: e.button.text || '' } : null
+                bu: e.button ? { u: e.button.url || '', x: e.button.text || '' } : null,
+                // Personal note (if any) so the recipient sees the
+                // friend's commentary in the sheet + list rows.
+                nt: self.getNote(e.id) || ''
             };
         });
         try {
@@ -1643,7 +1662,8 @@
                     lat: e.la, lon: e.lo,
                     image: e.im, imageThumb: e.th,
                     rating: e.ra, tag: e.tg,
-                    button: e.bu ? { url: e.bu.u || '', text: e.bu.x || '' } : { url: '', text: '' }
+                    button: e.bu ? { url: e.bu.u || '', text: e.bu.x || '' } : { url: '', text: '' },
+                    note: e.nt || ''
                 };
             });
         } catch (e) { return null; }
@@ -1869,22 +1889,30 @@
         if (action === 'save') {
             // Save them all into the user's localStorage. We piggy-back on
             // toggleSavedPoi by synthesizing a POI-shaped object per pick.
+            // We deliberately DON'T overwrite an existing user note - their
+            // own text wins over the friend's; only fill in if absent.
             var saved = this.readSaved();
+            var notes = this.readNotes();
             var added = 0;
             picks.forEach(function (p) {
-                if (saved[ String(p.id) ]) return; // already saved
-                added++;
-                saved[ String(p.id) ] = {
-                    id: p.id, title: p.title, cat: p.cat, type: p.type,
-                    lat: p.lat, lon: p.lon,
-                    image: p.image, imageThumb: p.imageThumb,
-                    rating: p.rating, tag: p.tag,
-                    blurb: '', description: '',
-                    button: p.button || { url: '', text: '' },
-                    savedAt: Date.now()
-                };
+                if (!saved[ String(p.id) ]) {
+                    added++;
+                    saved[ String(p.id) ] = {
+                        id: p.id, title: p.title, cat: p.cat, type: p.type,
+                        lat: p.lat, lon: p.lon,
+                        image: p.image, imageThumb: p.imageThumb,
+                        rating: p.rating, tag: p.tag,
+                        blurb: '', description: '',
+                        button: p.button || { url: '', text: '' },
+                        savedAt: Date.now()
+                    };
+                }
+                if (p.note && !notes[ String(p.id) ]) {
+                    notes[ String(p.id) ] = { text: String(p.note), updatedAt: Date.now() };
+                }
             });
             this.writeSaved(saved);
+            this.writeNotes(notes);
             this.showToast(added + ' spot' + (added === 1 ? '' : 's') + ' saved');
             this.hideReceivePopup();
             this.setRoute('save');

@@ -49,6 +49,13 @@
 </div>
 {{/if}}
 
+{{#if hasNote}}
+<button type="button" class="in-sheet__note-preview" data-innsight-note-preview aria-label="Open personal note">
+    <span class="in-sheet__note-label">Your note</span>
+    <span class="in-sheet__note-text">{{noteText}}</span>
+</button>
+{{/if}}
+
 <div class="in-sheet__actions">
     <button class="in-sheet__act" data-innsight-sheet-save>Save</button>
     {{#if button.url}}<a class="in-sheet__act in-sheet__act--primary" href="{{button.url}}" target="_blank" rel="noopener">{{button.text}}</a>{{/if}}

@@ -1,4 +1,37 @@
 # Changelog
+## 0.5.8 - 2026-05-14
+
+Personal notes are now first-class: they ride along with shares and
+surface everywhere a POI does.
+
+### Notes carry with shares
+
+- `encodeSharedPicks` includes the friend's note alongside each pick.
+- `handleReceiveChoice('save')` writes notes into the recipient's
+  `localStorage[innsight.notes]` keyed by POI id - so the friend's
+  commentary stays with each spot after Save Them All.
+- We DON'T overwrite a recipient's existing note for a POI - their own
+  text wins over a friend's; we only fill in when blank.
+- In "Just preview" mode, the synthesized POI carries `poi.note` so
+  the friend's note still renders in the list rows + sheet during the
+  preview session (no persistence).
+
+### Notes visible in Saved + List rows
+
+- New `.in-row__note` block on every list-row that has a note.
+  Accent background, ink text, dashed-border-friendly.
+- **Mobile** (< 768px): stacks on a new row below the meta line, aligned
+  with the body content; clamped to 2 lines with ellipsis.
+- **Desktop** (≥ 768px): floats to the right of the row body as a
+  fixed-width column (240px), clamped to 3 lines.
+
+### Notes visible in the sheet
+
+- New `.in-sheet__note-preview` block sits **above** the Save / More
+  info actions. Accent background, ink text, 3-line clamp with
+  ellipsis. The entire block is a button - tap it to open the full
+  notes editor for inline editing.
+
 ## 0.5.7 - 2026-05-14
 
 - **Share links survive WhatsApp / iMessage / SMS auto-linking.**

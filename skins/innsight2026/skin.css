@@ -587,6 +587,47 @@
     font-size: 12px; font-weight: 500;
 }
 
+/* Personal-note preview above the sheet actions. Accent background +
+ * dark text + 3-line clamp; entire block is a button that opens the
+ * full notes editor on tap. */
+.in-sheet__note-preview {
+    display: block;
+    width: 100%;
+    background: var(--in-accent);
+    color: var(--in-ink);
+    border: 1.5px solid var(--in-ink);
+    box-shadow: 2px 2px 0 var(--in-ink);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: transform 120ms, box-shadow 120ms;
+}
+.in-sheet__note-preview:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--in-ink); }
+.in-sheet__note-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--in-ink);
+    opacity: 0.7;
+    margin-bottom: 4px;
+}
+.in-sheet__note-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    line-height: 1.45;
+    font-style: italic;
+    word-break: break-word;
+}
+
 /* Sheet actions */
 .in-sheet__actions {
     display: flex; gap: 10px;
@@ -801,6 +842,44 @@
     border: 1px solid var(--in-ink);
     padding: 2px 7px;
     border-radius: 999px;
+}
+
+/* Personal note row block. Mobile: stacks below the meta row, aligned
+ * with the body content (78px = 56px sticker + 14px gap + 8px breathing).
+ * Desktop: floats to the right with a fixed-width column so the row
+ * keeps a clean single line. Truncates to 2 lines mobile / 3 lines
+ * desktop with an ellipsis. */
+.in-row__note {
+    flex-basis: 100%;
+    margin: 8px 0 0 70px;
+    background: var(--in-accent);
+    color: var(--in-ink);
+    border: 1.5px solid var(--in-ink);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    font-style: italic;
+    /* 2-line clamp with ellipsis. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
+}
+@media (min-width: 768px) {
+    .in-row__note {
+        flex-basis: auto;
+        flex: 0 0 240px;
+        margin: 0 0 0 auto;
+        align-self: center;
+        -webkit-line-clamp: 3;
+    }
+    .in-row { flex-wrap: nowrap; }
+}
+@media (max-width: 767px) {
+    .in-row { flex-wrap: wrap; }
 }
 
 /* ── Empty state (Saved / You) ───────────────────────────────────────────── */
