@@ -53,6 +53,8 @@ final class Plugin {
     private $legacy_compat;
     /** @var DefaultsPage */
     private $defaults_page;
+    /** @var CacheManager */
+    private $cache_manager;
     /** @var bool */
     private $booted = false;
 
@@ -91,6 +93,7 @@ final class Plugin {
         $this->import_page     = new ImportPage( $this->poi_importer, $this->poi_exporter );
         $this->legacy_compat   = new LegacyCompat();
         $this->defaults_page   = new DefaultsPage();
+        $this->cache_manager   = new CacheManager();
 
         /**
          * Allow extensions to swap any service before hook registration.
@@ -116,6 +119,7 @@ final class Plugin {
             'import_page'     => $this->import_page,
             'legacy_compat'   => $this->legacy_compat,
             'defaults_page'   => $this->defaults_page,
+            'cache_manager'   => $this->cache_manager,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
@@ -132,6 +136,7 @@ final class Plugin {
         $this->rest_controller->register();
         $this->kml_export->register();
         $this->assets->register();
+        $this->cache_manager->register();
         if ( is_admin() ) {
             $this->admin->register();
             $this->defaults_page->register();

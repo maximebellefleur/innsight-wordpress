@@ -40,6 +40,13 @@ final class SkinPartials {
             return null;
         }
 
+        // Cache key MUST include INNSIGHT_VERSION because some upload paths
+        // (rsync -t, FTP with preserve-timestamp, certain managed hosts)
+        // keep the original file mtimes when extracting an updated plugin
+        // zip. Without the version in the key, the transient stays stale
+        // forever and visitors load the old layout / sheet / pin partials
+        // even though the on-disk files are new. With the version in the
+        // key, every release forces a fresh cache entry guaranteed.
         $signature = (string) filemtime( $manifest_path );
         $watched = array( 'layout.html', 'popup.html', 'cluster.html', 'pin.html', 'sheet.html', 'list-row.html', 'list-item.html', 'empty-state.html', 'skin.css', 'skin.js' );
         foreach ( $watched as $f ) {
@@ -47,7 +54,8 @@ final class SkinPartials {
                 $signature .= '|' . filemtime( $base . $f );
             }
         }
-        $cache_key = 'innsight_partials_' . md5( $skin_name . '|' . $signature );
+        $version = defined( 'INNSIGHT_VERSION' ) ? INNSIGHT_VERSION : '0';
+        $cache_key = 'innsight_partials_' . md5( $skin_name . '|' . $version . '|' . $signature );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             $this->cache[ $skin_name ] = $cached;

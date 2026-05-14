@@ -141,7 +141,23 @@ final class Admin {
             return;
         }
         echo '<div class="wrap"><h1>' . esc_html__( 'Innsight', 'innsight' ) . ' <span style="font-size:13px;font-weight:400;color:#646970;background:#f0f0f1;padding:2px 8px;border-radius:3px;vertical-align:middle">v' . esc_html( INNSIGHT_VERSION ) . '</span></h1>';
+
+        // Post-purge success notice (after the redirect from
+        // admin-post.php?action=innsight_purge_caches).
+        if ( ! empty( $_GET['innsight_purged'] ) ) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Innsight caches purged. Reload the front-end to confirm fresh assets.', 'innsight' ) . '</p></div>';
+        }
+
         echo '<p>' . esc_html__( 'Configure how the Innsight map engine renders inside this site. The plugin reads existing yuna-innsight DB structures (POI taxonomy, portfolio activities, ACF options) without modification.', 'innsight' ) . '</p>';
+
+        // Cache-purge call-to-action. Bridges the gap when a host's
+        // page cache (WP Engine NGINX, Kinsta edge, Cloudflare APO,
+        // FastCGI cache) keeps serving the old HTML to non-logged-in
+        // visitors. Triggers our CacheManager which loops every
+        // page-cache plugin / managed-host API we know about.
+        $purge_url = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_purge_caches' ), 'innsight_purge_caches' );
+        echo '<div style="background:#fffbe5;border-left:4px solid #f0b849;padding:12px 14px;margin:14px 0;max-width:780px"><p style="margin:0 0 6px"><strong>' . esc_html__( 'Visitors seeing old layouts after an upgrade?', 'innsight' ) . '</strong></p><p style="margin:0 0 8px">' . esc_html__( 'Click below to flush the Innsight partial cache plus every page-cache plugin we recognise (WP Rocket, LiteSpeed, W3TC, WP Super Cache, SG Optimizer, Hummingbird, Breeze, Cache Enabler, WP Fastest Cache, WP Engine, Kinsta, Pantheon, NGINX Helper).', 'innsight' ) . '</p><a href="' . esc_url( $purge_url ) . '" class="button button-primary">' . esc_html__( 'Purge Innsight caches now', 'innsight' ) . '</a></div>';
+
         echo '<form method="post" action="options.php">';
         settings_fields( 'innsight_settings_group' );
         do_settings_sections( self::PAGE_SLUG );

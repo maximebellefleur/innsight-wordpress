@@ -1,4 +1,57 @@
 # Changelog
+## 0.5.2 - 2026-05-14
+
+Critical cache-coherency fix. After upload, visitors (especially
+non-logged-in ones, but logged-in too on hosts with object cache)
+were getting a mix of old HTML and new JS, breaking dynamic features
+like Save / tab clicks / count updates with no console error.
+
+### Root cause
+
+`SkinPartials` cached the inlined layout / sheet / pin partials in a
+transient keyed only by file `mtime`s. When the plugin zip was
+extracted with preserved timestamps (FTP, rsync -t, certain managed
+hosts, Git checkouts) the cache key didn't change → server kept
+serving the OLD partials transient → page HTML had old DOM hooks
+while the freshly-fetched skin.js looked for new ones. Symptom: tab
+buttons did nothing, Save was inert, no console error because every
+`querySelector` for new hooks just returned `null` and the new code
+no-op'd on missing elements.
+
+### Fix
+
+- **Partials cache key now includes `INNSIGHT_VERSION`** so every
+  release force-invalidates regardless of file mtimes. Single line
+  change with massive impact: stale partials can no longer survive
+  a version bump.
+- **New `CacheManager` service** that runs on `upgrader_process_complete`,
+  on `activated_plugin`, and from a manual admin button. It:
+  - Wipes our own `_transient_innsight_partials_*` and
+    `_transient_innsight_geocode_*` rows from the options table.
+  - Calls `wp_cache_flush_group('innsight')` for object caches.
+  - Flushes every major WordPress page cache plugin we recognise:
+    WP Rocket, W3 Total Cache, WP Super Cache, LiteSpeed, Hummingbird,
+    SG Optimizer, Cache Enabler, WP Fastest Cache, Breeze, Autoptimize.
+  - Hits managed-host edge caches: WP Engine (Varnish + memcached),
+    Kinsta, Pantheon, NGINX Helper.
+  - Emits `do_action('innsight/cache_purged')` so sites with custom
+    Cloudflare / Varnish layers can hook the purge.
+- **"Purge Innsight caches now" button** on the Settings page
+  (yellow callout at the top) for the post-upload click-once fix
+  when a host's auto-purge missed something.
+- **Activation hook also calls purge_now()** so a manual re-zip /
+  WP-CLI install path that doesn't fire `upgrader_process_complete`
+  still gets a clean cache state.
+
+### Why visitors saw a "mix of old and new"
+
+Logged-in users normally bypass HTTP page caches but still read from
+WordPress object cache (Redis / Memcached) where the partials
+transient lives. Logged-out users hit BOTH the page cache AND the
+transient cache. Before this release: bumping the plugin updated the
+files on disk but neither cache layer noticed. After this release:
+both layers get explicitly evicted on every upgrade.
+
 ## 0.5.1 - 2026-05-14
 
 - **Desktop sheet sizing.** On viewports ≥ 900px the bottom sheet,

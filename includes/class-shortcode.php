@@ -136,7 +136,11 @@ final class Shortcode {
         if ( ! $this->partials_emitted ) {
             $partials = $this->skin_partials->read( (string) $config['skin']['name'] );
             if ( is_array( $partials ) ) {
-                $partials_block = '<script>window.INNSIGHT_SKIN_PARTIALS=' . wp_json_encode( $partials ) . ';</script>';
+                // Stamp the partials with the current plugin version. The
+                // bootstrap below uses this to detect "page HTML cached at
+                // version A, JS+CSS asset URLs at version B" mismatches and
+                // force a one-time clean reload that bypasses the page cache.
+                $partials_block = '<script>window.INNSIGHT_SKIN_PARTIALS=' . wp_json_encode( $partials ) . ';window.INNSIGHT_PARTIALS_VERSION=' . wp_json_encode( INNSIGHT_VERSION ) . ';</script>';
                 $this->partials_emitted = true;
             }
         }
@@ -150,6 +154,10 @@ final class Shortcode {
         // attaches `.init`. A `typeof Innsight === "undefined"` check passes
         // too early (Innsight is "object", not "undefined") and we'd call a
         // function that doesn't exist yet. Wait for `.init` specifically.
+        // Skin's checkVersion() reads INNSIGHT_PARTIALS_VERSION (set above)
+        // and compares to its baked-in SKIN_VERSION; a mismatch forces a
+        // one-time reload with cache-bypass to repair the cached-HTML +
+        // fresh-JS state.
         return $partials_block . '<script>(function(){function _go(){if(!window.Innsight||typeof window.Innsight.init!=="function"){return setTimeout(_go,30);}' . $config_js . $init_js . '}_go();})();</script>';
     }
 
