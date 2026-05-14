@@ -1,4 +1,35 @@
 # Changelog
+## 0.5.3 - 2026-05-14
+
+Notes panel rewrite. Three reported bugs in one fix:
+
+- **Panel was appearing without the user tapping anything** on desktop -
+  the panel was eagerly created on every sheet open AND
+  CSS-transform-only hidden, so any race in style application left it
+  visible. **Fix**: lazy-create on first peek interaction; hidden via
+  HTML `hidden` attribute + CSS `display:none` (belt-and-braces).
+- **Panel escaped the shortcode container** and pinned itself to the
+  page, scrolling visitors out of the map area. **Fix**: append the
+  panel to `.in-app` (positioned ancestor with `overflow: hidden`)
+  instead of `.innsight-map-target` (static positioning).
+- **Done button silently failed to close** on certain Safari builds.
+  **Fix**: bind both `click` and `pointerup`; tap-to-close on the head
+  + Done button always reach the same singleton handler regardless of
+  how many sheets have opened.
+
+Other improvements:
+
+- Drag-up threshold raised from 60 → 100px so a sheet body scroll
+  starting over the peek can't accidentally open notes.
+- Panel now fills the full `.in-app` footprint on every viewport
+  size (removed the desktop "centered floating card" override that
+  was overlapping the sheet hero in the screenshot you sent).
+- Slide-up animation switched from CSS `transition: transform` to
+  a `@keyframes` animation triggered on display change, so the
+  first-open-per-session no longer skips the animation.
+- Panel head ignores pointerdown when the touch starts on the Done
+  button, preventing the drag-down handler from eating the tap.
+
 ## 0.5.2 - 2026-05-14
 
 Critical cache-coherency fix. After upload, visitors (especially

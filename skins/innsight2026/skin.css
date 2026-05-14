@@ -1173,26 +1173,38 @@ body.innsight-sheet-locked {
     50%      { transform: translateY(3px); }
 }
 
-/* The full-screen notes panel, slides over the sheet. Uses a CSS variable
- * --in-notes-h that JS updates from visualViewport so the keyboard never
- * hides the textarea. */
+/* Notes panel - covers the full .in-app footprint when open.
+ *
+ * Hidden states use BOTH `display:none` (via the [hidden] HTML attribute
+ * the JS sets) AND `display:none` in CSS as a backstop, because past
+ * versions of the panel rendered visible due to transform-only hides
+ * being defeated by ancestor positioning. The `.is-notes-open` class on
+ * `.in-app` flips display to flex AND triggers a slide-up animation.
+ *
+ * --in-notes-h is updated by the JS from visualViewport.height so the
+ * keyboard never hides the textarea on iOS / Android. Default 100% =
+ * fill the .in-app container.
+ */
 .in-notes {
     position: absolute;
     left: 0; right: 0; bottom: 0;
     height: var(--in-notes-h, 100%);
     z-index: 90;
-    transform: translateY(102%);
-    transition: transform 320ms cubic-bezier(.32,.72,.2,1);
-    pointer-events: none;
     background: var(--in-sheet);
     border-top-left-radius: 28px;
     border-top-right-radius: 28px;
     box-shadow: 0 -16px 50px rgba(0,0,0,0.22);
-    display: flex; flex-direction: column;
+    flex-direction: column;
+    display: none;           /* hidden by default, no exceptions */
 }
+.in-notes[hidden] { display: none !important; }   /* belt-and-braces */
 .in-app.is-notes-open .in-notes {
-    transform: translateY(0);
-    pointer-events: auto;
+    display: flex;
+    animation: in-notes-slide-up 320ms cubic-bezier(.32,.72,.2,1) backwards;
+}
+@keyframes in-notes-slide-up {
+    from { transform: translateY(100%); opacity: 0.6; }
+    to   { transform: translateY(0);    opacity: 1; }
 }
 .in-notes__inner {
     flex: 1;
@@ -1519,14 +1531,10 @@ body.innsight-sheet-locked {
     .in-hero__initial { font-size: 92px; }
     .in-sheet__title { font-size: 44px; }
     .in-sheet__blurb { font-size: 16px; }
-    /* Notes panel / share menu / receive popup also constrain so they
-     * align with the sheet's centred footprint. */
-    .in-notes {
-        width: 56%; max-width: 720px; min-width: 480px;
-        left: 50%; right: auto; transform: translate(-50%, 102%);
-        border-radius: 28px 28px 0 0;
-    }
-    .in-app.is-notes-open .in-notes { transform: translate(-50%, 0); }
+    /* Notes panel deliberately fills the FULL .in-app on desktop too so
+     * it visibly takes over the sheet (no awkward floating-card look
+     * that overlaps the sheet hero). The animation comes from
+     * @keyframes in-notes-slide-up; no transform overrides here. */
     .in-share-menu__inner {
         width: 56%; max-width: 720px; min-width: 480px;
         margin: 0 auto;
@@ -1536,6 +1544,5 @@ body.innsight-sheet-locked {
 
 @media (min-width: 1280px) {
     .in-sheet__inner { width: 50%; max-width: 760px; }
-    .in-notes        { width: 50%; max-width: 760px; }
     .in-share-menu__inner { width: 50%; max-width: 760px; }
 }

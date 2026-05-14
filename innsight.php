@@ -3,7 +3,7 @@
  * Plugin Name:       Innsight
  * Plugin URI:        https://github.com/maximebellefleur/innsight-wordpress
  * Description:       Renders the Innsight map engine inside WordPress. Reads the existing yuna-innsight DB structures (POI taxonomy, portfolio activities, event posts, options-page defaults) and emits a v1 JSON config for the Innsight JS engine. Provides a [innsight_map] shortcode (and a [custom_map] alias) plus a /wp-json/innsight/v1/map REST endpoint.
- * Version:           0.5.2
+ * Version:           0.5.3
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Maxime Bellefleur / Solike Group
@@ -22,7 +22,7 @@ if ( defined( 'INNSIGHT_VERSION' ) ) {
     return;
 }
 
-define( 'INNSIGHT_VERSION', '0.5.2' );
+define( 'INNSIGHT_VERSION', '0.5.3' );
 define( 'INNSIGHT_FILE', __FILE__ );
 define( 'INNSIGHT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'INNSIGHT_URL', plugin_dir_url( __FILE__ ) );

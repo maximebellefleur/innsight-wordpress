@@ -1385,122 +1385,93 @@
     };
 
     /**
-     * Wire the notes pull-up: pointer drag on the peek strip, click-to-open
-     * fallback, textarea auto-save, drag-down to close. Called once per
-     * sheet render (the strip is part of the sheet template).
+     * Lazy singleton notes panel. The panel is NOT created until the user
+     * actually taps the peek strip - this guarantees it can't accidentally
+     * appear from a CSS race or a stale class. Once created, it's parked
+     * under `.in-app` (positioned ancestor with `overflow: hidden`) and
+     * reused for every POI. The textarea content + the active poi id swap
+     * per open. Done button always closes because it's bound to the
+     * singleton at creation time.
      */
-    SkinController.prototype.bindNotesPanel = function (inner) {
-        var self = this;
-        var peek  = inner.querySelector('[data-innsight-notes-peek]');
-        if (!peek || !this.sheet.poi) return;
-
-        var poiId = String(this.sheet.poi.id);
-        // Build the panel once per sheet render. It's a sibling of the
-        // sheet inner so it can full-cover the sheet without inheriting
-        // its scroll lock. Position is fixed-bottom, animated up.
-        var panel = this.target.querySelector('[data-innsight-notes-panel]');
-        if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
-        panel = document.createElement('div');
+    SkinController.prototype.ensureNotesPanel = function () {
+        if (this._notesPanel && this._notesPanel.parentNode === this.app) {
+            return this._notesPanel;
+        }
+        // Wipe ANY stale instance from prior buggy versions (could be
+        // hanging off this.target or even document.body in pre-0.5.3).
+        var stale = (this.target && this.target.querySelectorAll('[data-innsight-notes-panel]')) || [];
+        for (var s = 0; s < stale.length; s++) {
+            if (stale[s].parentNode) stale[s].parentNode.removeChild(stale[s]);
+        }
+        var panel = document.createElement('div');
         panel.className = 'in-notes';
         panel.setAttribute('data-innsight-notes-panel', '');
-        panel.setAttribute('aria-hidden', 'true');
+        // Belt-and-braces: hidden by HTML attr AND by CSS. The class
+        // toggle below adds `is-notes-open` on .in-app to reveal it.
+        panel.hidden = true;
         panel.innerHTML =
             '<div class="in-notes__inner">' +
-                '<div class="in-notes__head">' +
+                '<div class="in-notes__head" data-innsight-notes-head>' +
                     '<span class="in-notes__grabber" aria-hidden="true"></span>' +
                     '<div class="in-notes__title">Personal note</div>' +
-                    '<button type="button" class="in-notes__close" aria-label="Close note">Done</button>' +
+                    '<button type="button" class="in-notes__close" data-innsight-notes-close aria-label="Close note">Done</button>' +
                 '</div>' +
                 '<div class="in-notes__sub" data-innsight-notes-status>Auto-saving as you type</div>' +
                 '<textarea class="in-notes__area" data-innsight-notes-area ' +
                     'placeholder="Anything you want to remember about this place — vibes, prices, what to order, who you went with…" ' +
                     'rows="6" autocomplete="off" autocorrect="on" spellcheck="true"></textarea>' +
             '</div>';
-        this.target.appendChild(panel);
+        // CRITICAL: append to .in-app, NOT .innsight-map-target. .in-app
+        // has position: relative + overflow: hidden so the panel's
+        // absolute positioning stays inside the shortcode footprint.
+        this.app.appendChild(panel);
+        this._notesPanel = panel;
 
-        var area   = panel.querySelector('[data-innsight-notes-area]');
-        var status = panel.querySelector('[data-innsight-notes-status]');
-        var closeBtn = panel.querySelector('.in-notes__close');
-        var head   = panel.querySelector('.in-notes__head');
+        var self = this;
+        var closeBtn = panel.querySelector('[data-innsight-notes-close]');
+        var head     = panel.querySelector('[data-innsight-notes-head]');
+        var area     = panel.querySelector('[data-innsight-notes-area]');
+        var status   = panel.querySelector('[data-innsight-notes-status]');
 
-        area.value = self.getNote(poiId);
-
-        // Debounced save - 350ms after the user stops typing. Saving is
-        // synchronous (localStorage) so we don't actually need a network
-        // request; the debounce just avoids hammering JSON.stringify.
         var saveTimer = null;
         area.addEventListener('input', function () {
-            if (status) {
-                status.classList.remove('is-saved');
-                status.textContent = 'Saving…';
-            }
+            if (status) { status.classList.remove('is-saved'); status.textContent = 'Saving…'; }
             clearTimeout(saveTimer);
             saveTimer = setTimeout(function () {
-                self.saveNote(poiId, area.value, status);
-                // Reflect "has note" badge state on the peek strip text.
-                var label = peek.querySelector('.in-sheet__notes-peek-label');
-                if (label) label.textContent = area.value ? 'Your note' : 'Add a personal note';
+                self.saveNote(self._notesActiveId, area.value, status);
+                if (self._notesActivePeekLabel) {
+                    self._notesActivePeekLabel.textContent = area.value ? 'Your note' : 'Add a personal note';
+                }
             }, 350);
         });
-        // Save on blur too so closing the panel never loses a fresh keystroke.
         area.addEventListener('blur', function () {
             clearTimeout(saveTimer);
-            self.saveNote(poiId, area.value, status);
+            self.saveNote(self._notesActiveId, area.value, status);
         });
 
-        function openPanel() {
-            self.app.classList.add('is-notes-open');
-            panel.setAttribute('aria-hidden', 'false');
-            // Defer focus so iOS Safari doesn't fight the slide-up animation.
-            setTimeout(function () { try { area.focus(); } catch (e) {} }, 320);
+        // Done. Multiple events because some Safari versions occasionally
+        // swallow click events that follow keyboard dismissal - pointerup
+        // catches that case.
+        function doClose(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            self.closeNotesPanel();
         }
-        function closePanel() {
-            self.app.classList.remove('is-notes-open');
-            panel.setAttribute('aria-hidden', 'true');
-            try { area.blur(); } catch (e) {}
-        }
+        closeBtn.addEventListener('click', doClose);
+        closeBtn.addEventListener('pointerup', doClose);
 
-        // Tap / Enter / Space on the peek opens the panel.
-        peek.addEventListener('click', openPanel);
-        peek.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPanel(); }
+        var dragStartY = 0, dragging = false;
+        head.addEventListener('pointerdown', function (e) {
+            // Don't hijack a tap on Done as a drag start.
+            if (e.target === closeBtn || closeBtn.contains(e.target)) return;
+            dragStartY = e.clientY; dragging = true;
         });
-        closeBtn.addEventListener('click', closePanel);
-
-        // Pointer-drag to expand from the peek (drag UP) and to dismiss
-        // from the panel head (drag DOWN). Threshold 60px so it doesn't
-        // accidentally trigger during a tap.
-        var dragStartY = 0, dragging = false, mode = null;
-        function onPeekDown(e) {
-            dragStartY = e.clientY; dragging = true; mode = 'peek-up';
-            try { peek.setPointerCapture(e.pointerId); } catch (er) {}
-        }
-        function onHeadDown(e) {
-            dragStartY = e.clientY; dragging = true; mode = 'panel-down';
-            try { head.setPointerCapture(e.pointerId); } catch (er) {}
-        }
-        function onMove(e) {
+        head.addEventListener('pointermove', function (e) {
             if (!dragging) return;
-            var dy = e.clientY - dragStartY;
-            if (mode === 'peek-up' && dy < -60) {
-                dragging = false; openPanel();
-            } else if (mode === 'panel-down' && dy > 60) {
-                dragging = false; closePanel();
-            }
-        }
-        function onUp() { dragging = false; mode = null; }
-        peek.addEventListener('pointerdown', onPeekDown);
-        peek.addEventListener('pointermove', onMove);
-        peek.addEventListener('pointerup', onUp);
-        peek.addEventListener('pointercancel', onUp);
-        head.addEventListener('pointerdown', onHeadDown);
-        head.addEventListener('pointermove', onMove);
-        head.addEventListener('pointerup', onUp);
-        head.addEventListener('pointercancel', onUp);
+            if (e.clientY - dragStartY > 80) { dragging = false; self.closeNotesPanel(); }
+        });
+        head.addEventListener('pointerup', function () { dragging = false; });
+        head.addEventListener('pointercancel', function () { dragging = false; });
 
-        // Keyboard-aware: when the on-screen keyboard appears, the visual
-        // viewport shrinks. We resize the textarea to fit so the user can
-        // see what they're typing without needing to scroll.
         if (root.visualViewport) {
             var resize = function () {
                 if (!self.app.classList.contains('is-notes-open')) return;
@@ -1508,9 +1479,77 @@
             };
             root.visualViewport.addEventListener('resize', resize);
             root.visualViewport.addEventListener('scroll', resize);
-            // Initial cleanup on close so the var doesn't linger.
-            self._notesViewportResize = resize;
         }
+
+        return panel;
+    };
+
+    SkinController.prototype.openNotesPanel = function () {
+        if (!this.sheet.poi) return;
+        var panel = this.ensureNotesPanel();
+        var poiId = String(this.sheet.poi.id);
+        var area  = panel.querySelector('[data-innsight-notes-area]');
+        if (area) area.value = this.getNote(poiId);
+        this._notesActiveId = poiId;
+        // Track the peek's label so input updates "Add a personal note" ↔ "Your note".
+        var inner = this.target.querySelector('[data-innsight-sheet-inner]');
+        this._notesActivePeekLabel = inner ? inner.querySelector('.in-sheet__notes-peek-label') : null;
+
+        panel.hidden = false;
+        // Force a reflow so the browser registers the hidden→visible
+        // transition before we add the open class. Without it the slide-
+        // up animation can skip on the first open per session.
+        // eslint-disable-next-line no-unused-expressions
+        panel.offsetHeight;
+        this.app.classList.add('is-notes-open');
+        var self = this;
+        setTimeout(function () { try { area && area.focus(); } catch (e) {} }, 320);
+    };
+
+    SkinController.prototype.closeNotesPanel = function () {
+        this.app.classList.remove('is-notes-open');
+        var panel = this._notesPanel;
+        if (!panel) return;
+        var area = panel.querySelector('[data-innsight-notes-area]');
+        if (area) { try { area.blur(); } catch (e) {} }
+        // Hide AFTER the slide-down animation finishes so the panel
+        // visibly transitions instead of vanishing instantly.
+        setTimeout(function () {
+            if (!panel.parentNode) return;
+            // Only hide if we're still in closed state (user might have
+            // re-opened during the transition).
+            if (!panel.parentNode.parentNode) return;
+            // Walk up: panel.parentNode = .in-app
+            if (!panel.parentNode.classList.contains('is-notes-open')) {
+                panel.hidden = true;
+            }
+        }, 340);
+    };
+
+    /**
+     * Per-sheet binding: bind the freshly-rendered peek strip's tap +
+     * drag-up gestures. Does NOT create the panel - that's lazy on first
+     * actual interaction so a sheet open never accidentally renders the
+     * notes panel.
+     */
+    SkinController.prototype.bindNotesPanel = function (inner) {
+        var self = this;
+        var peek = inner.querySelector('[data-innsight-notes-peek]');
+        if (!peek || !this.sheet.poi) return;
+
+        peek.onclick = function () { self.openNotesPanel(); };
+        peek.onkeydown = function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); self.openNotesPanel(); }
+        };
+        // Drag UP threshold raised to 100px so a sheet body scroll that
+        // happens to start over the peek doesn't accidentally open notes.
+        var pStartY = 0, pDragging = false;
+        peek.onpointerdown = function (e) { pStartY = e.clientY; pDragging = true; };
+        peek.onpointermove = function (e) {
+            if (!pDragging) return;
+            if (e.clientY - pStartY < -100) { pDragging = false; self.openNotesPanel(); }
+        };
+        peek.onpointerup = peek.onpointercancel = function () { pDragging = false; };
     };
 
     /* ── Share wishlist (Saved tab) ──────────────────────────────────────── */
