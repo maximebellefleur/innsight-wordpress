@@ -1,4 +1,92 @@
 # Changelog
+## 0.5.0 - 2026-05-14
+
+Big release: share-wishlist, personal notes, swipe-by-context, in-view
+Google Places, plus a critical PWA cleanup that finally evicts the old
+yuna service worker that was serving stale assets to returning visitors.
+
+### Saved tab
+
+- **Swipe context.** When the bottom sheet opens from the Saved tab,
+  swipe-left / swipe-right now cycles through the user's saved POIs
+  only (not the category siblings). The same context model also drives
+  swipe inside the List tab (cycles the filtered list) and the new
+  Friend's-picks mode (cycles the friend's selection). Default behavior
+  on map clicks is unchanged.
+- **Share Wishlist button** in the top-right of the Saved header.
+  Opens a bottom-sheet menu with Native (Web Share API where
+  available), WhatsApp, Facebook, Email, and Copy Link tiles. The link
+  carries a URL-safe base64 token of the user's saved POIs (id, title,
+  lat/lon, image, cat/type, tag, button) so recipients see every spot
+  even on a different site / different POI ids.
+
+### Receive flow (recipient)
+
+- **Receive popup** auto-pops on page load when `?innsight_share=...`
+  is present in the URL. Two choices: **Just preview** keeps the picks
+  in `sessionStorage` and reveals a dancing **Friend's picks** chip in
+  the filter bar; **Save them all** writes each pick into the user's
+  localStorage saved list. The URL param is stripped after consumption
+  so a refresh doesn't re-pop the modal.
+- **Dancing 'Friend's picks' chip** appears as the first chip in the
+  filter strip. Tapping it routes to List view and scopes the visible
+  POIs to the friend's selection. The chip carries an inline X to
+  dismiss the temporary selection (clears `sessionStorage`).
+- **All copy is editable** in plugin Settings → Share Wishlist (popup
+  title, body, button labels, dancing chip label, invite message).
+
+### Personal notes
+
+- **Pull-up notes panel** on every POI sheet. The peek strip at the
+  bottom of the sheet shows a downward arrow + "Add a personal note" /
+  "Your note" label + a hint of the textarea's top edge. Tap or
+  drag-up to expand a full-screen notes panel; drag-down on the panel
+  header collapses back to the sheet.
+- **Auto-save** (350ms debounce) to `localStorage[innsight.notes]`.
+  Status indicator goes "Auto-saving as you type" → "Saving…" → "Saved"
+  so the user is never anxious about losing input. Saves on blur too.
+- **Keyboard-aware**: a `--in-notes-h` CSS variable updated from
+  `visualViewport.resize` keeps the textarea visible above the on-
+  screen keyboard on iOS / Android.
+
+### Google Places (in-view)
+
+- **Triggered on every "in-view" event**, not just sheet open.
+  Swiping prev/next inside the sheet now also fires enrichment for
+  the newly-shown POI. The engine's localStorage cache short-circuits
+  any repeat network call, so swipes through previously-seen POIs
+  remain free.
+- **Loading placeholders** while the request is in flight: a
+  "Looking up live details…" pulsing chip in the meta row, a
+  shimmer-bar where the hours line will appear, and a placeholder
+  rating pill in the vibe wrap. Disappear cleanly once the request
+  resolves (or when the POI already has a server-side rating/hours).
+
+### PWA & cache
+
+- **Stale yuna service worker** (the predecessor plugin's SW scoped
+  to `/wp-content/plugins/yuna-innsight/js/`) is now unregistered on
+  every Innsight boot, with any cache name containing "yuna" purged
+  via `caches.delete()`. This was the root cause of "I cleared cache
+  but the old map still shows" reports — the SW intercepts every
+  request inside its scope.
+- **Plugin version stamp** in the v1 JSON (`pluginVersion`). The
+  skin compares against `localStorage[innsight.version]` and, on a
+  mismatch, wipes transient caches (swipe-hint counters, Google
+  Places negative-cache entries) without touching the user's saved
+  POIs / notes. A `console.info('[innsight] vX')` line confirms
+  which build is running.
+- **Mapbox style fixed**: the bundled `mapbox-style.json` was
+  referencing `road_label` (mapbox-streets-v7) instead of `road`
+  (v8); also swapped `DIN Pro` → `Open Sans` so the glyph fetch no
+  longer 404s for accounts without the Mapbox-only DIN Pro fonts.
+
+### Settings
+
+- New **Share wishlist** section in Settings → Innsight with seven
+  fields: enable toggle, invite message, popup title/body/buttons,
+  Friend's-picks chip label.
+
 ## 0.4.11 - 2026-05-12
 
 - **X "remove from saved" affordance on every saved row.** Tap the X on

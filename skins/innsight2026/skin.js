@@ -76,7 +76,13 @@
         this.query = '';
         this.sort = 'nearest';   // 'nearest' | 'az' | 'za'
         this.fullscreen = false;
-        this.sheet = { poi: null, hintShown: false, drag: 0, swiping: false, startX: 0, startY: 0, hintTimer: null };
+        this.sheet = { poi: null, hintShown: false, drag: 0, swiping: false, startX: 0, startY: 0, hintTimer: null, context: 'map' };
+        // Per-POI enrichment status. Once a POI has been resolved (with or
+        // without data) we mark its id here so the sheet's "Looking up live
+        // details…" placeholder doesn't flash on re-open. Cleared when the
+        // user manually refreshes the page (it's intentionally session-only;
+        // localStorage already cached the network result).
+        this.enrichSeen = {};
         this.app = this.target.querySelector('.in-app');
         // Cache the hostel POI (or any POI marked pinned=true) so we can
         // compute "distance from base" for every other POI without scanning
@@ -139,6 +145,11 @@
     };
 
     SkinController.prototype.boot = function () {
+        // PWA cleanup runs first so a stale yuna service worker can't keep
+        // serving an old engine/skin from cache.
+        this.cleanupStaleServiceWorkers();
+        this.checkVersion();
+
         this.applyBranding();
         this.renderChips();
         this.bindChrome();
@@ -148,10 +159,90 @@
         this.bindSortMenu();
         this.bindFullscreenSync();
         this.bindEngineEvents();
+        this.bindShareControls();
+        this.bindReceiveControls();
         this.startLiveLocation();
         this.updateCounts();
         // Sync route class on first render so CSS scope variants apply.
         this.setRoute('map');
+        // After everything is wired, check for ?innsight_share=... in the URL
+        // and pop the receive modal. Also restore the dancing 'Friend's picks'
+        // chip if the user previously chose Preview and is mid-session.
+        this.consumeShareUrl();
+        this.restoreSharedPicksChip();
+    };
+
+    /* ── PWA hygiene ─────────────────────────────────────────────────────── */
+
+    /**
+     * Unregister any service worker still scoped to /yuna-innsight/ - that
+     * was the predecessor plugin and it had a SW that intercepts every
+     * request inside its scope, which causes "even after clearing cache I
+     * still see the old map" reports on returning visitors. Also prune
+     * any caches whose name mentions yuna so installed PWAs get cleaned
+     * up on the first visit after the upgrade. Safe to run on every load
+     * - the operations are no-ops once cleanup has happened.
+     */
+    SkinController.prototype.cleanupStaleServiceWorkers = function () {
+        try {
+            if (root.navigator && root.navigator.serviceWorker && root.navigator.serviceWorker.getRegistrations) {
+                root.navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    regs.forEach(function (reg) {
+                        var scope = (reg.scope || '');
+                        if (scope.indexOf('yuna-innsight') >= 0 || scope.indexOf('yuna_innsight') >= 0) {
+                            reg.unregister().then(function () {
+                                if (root.console) root.console.info('[innsight] unregistered stale SW:', scope);
+                            });
+                        }
+                    });
+                });
+            }
+            if (root.caches && root.caches.keys) {
+                root.caches.keys().then(function (names) {
+                    names.forEach(function (name) {
+                        if (name.indexOf('yuna') >= 0) root.caches.delete(name);
+                    });
+                });
+            }
+        } catch (e) { /* old browsers - no SW API */ }
+    };
+
+    /**
+     * Stamp the running engine version into localStorage. When the version
+     * changes from a prior visit we wipe transient caches (swipe-hint
+     * counters, Google Places negative cache) so any odd state from the
+     * previous build doesn't bleed into the new one. We deliberately
+     * preserve `innsight.savedPois` and `innsight.notes` - the user's data
+     * is sacred.
+     */
+    SkinController.prototype.checkVersion = function () {
+        // `version` in the v1 JSON is the schema number (1). The plugin
+        // release version is `pluginVersion`, set by JsonBuilder.
+        var current = String((this.cfg && this.cfg.pluginVersion) || '');
+        if (!current) return;
+        var stored = '';
+        try { stored = root.localStorage.getItem('innsight.version') || ''; } catch (e) {}
+        if (root.console) root.console.info('[innsight] v' + current + (stored && stored !== current ? ' (was ' + stored + ')' : ''));
+        if (stored && stored !== current) {
+            try {
+                // Wipe non-user caches.
+                root.localStorage.removeItem('innsight.swipeHint.count');
+                root.localStorage.removeItem('innsight.swipeHint.lastSeen');
+                // Clear negative-cache Google Places entries; positive ones
+                // are fine to keep (place facts don't change with engine
+                // releases).
+                for (var i = root.localStorage.length - 1; i >= 0; i--) {
+                    var k = root.localStorage.key(i);
+                    if (k && k.indexOf('innsight:gp:') === 0) {
+                        try {
+                            var entry = JSON.parse(root.localStorage.getItem(k) || '{}');
+                            if (entry && entry.notFound) root.localStorage.removeItem(k);
+                        } catch (er) {}
+                    }
+                }
+            } catch (e) {}
+        }
+        try { root.localStorage.setItem('innsight.version', current); } catch (e) {}
     };
 
     /* ── Live location ───────────────────────────────────────────────────── */
@@ -475,8 +566,11 @@
             chips[i].setAttribute('aria-pressed', chips[i].getAttribute('data-cat') === cat ? 'true' : 'false');
         }
         // Engine filter: show all clusters and let the engine substring match;
-        // for cat we filter the visible markers' types directly.
-        if (this.state.instance && this.state.instance.filter) {
+        // for cat we filter the visible markers' types directly. Skip the
+        // engine filter for the virtual '__shared' category - we keep the
+        // map showing all POIs in that mode and let the list-view scope to
+        // the friend's picks.
+        if (cat !== '__shared' && this.state.instance && this.state.instance.filter) {
             this.state.instance.filter({ cat: cat, query: this.query });
         }
         if (this.route === 'list') this.renderList();
@@ -496,6 +590,27 @@
         var pois = this.cfg.pois || [];
         var cat = this.cat;
         var q = (this.query || '').toLowerCase();
+        // Virtual '__shared' category: filter to the friend's shared picks
+        // when present. Falls back to all POIs if the session has no picks.
+        if (cat === '__shared') {
+            var picks = this.readSharedPicks();
+            if (!picks || !picks.length) return [];
+            var liveById = {};
+            for (var i = 0; i < pois.length; i++) liveById[ String(pois[i].id) ] = pois[i];
+            return picks.map(function (p) {
+                return liveById[ String(p.id) ] || {
+                    id: p.id, title: p.title, name: p.title,
+                    cat: p.cat, type: p.type,
+                    lat: p.lat, lon: p.lon,
+                    image: p.image, imageThumb: p.imageThumb,
+                    rating: p.rating, tag: p.tag,
+                    button: p.button || { url: '', text: '' },
+                    open: true, __synthetic: true
+                };
+            }).filter(function (p) {
+                return !q || (p.title || p.name || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
         return pois.filter(function (p) {
             if (cat !== 'all' && p.cat !== cat && p.type !== cat) return false;
             if (q && (p.title || p.name || '').toLowerCase().indexOf(q) === -1) return false;
@@ -521,9 +636,20 @@
     };
 
     /* ── Bottom sheet ────────────────────────────────────────────────────── */
-    SkinController.prototype.openSheet = function (poi) {
+    /**
+     * Opens the bottom sheet for a POI. The optional `opts.context` field
+     * tells the sheet which list to cycle through when the user swipes left
+     * or right:
+     *   - 'map'    (default) - POIs sharing the same category/type
+     *   - 'list'   - the currently filtered + sorted list view
+     *   - 'saved'  - the user's saved POIs only (kept tab)
+     *   - 'shared' - a friend's shared wishlist (after Preview choice)
+     * Defaults to 'map' so opening from a marker keeps today's behaviour.
+     */
+    SkinController.prototype.openSheet = function (poi, opts) {
         this.sheet.poi = poi;
         this.sheet.drag = 0;
+        this.sheet.context = (opts && opts.context) || 'map';
         this.renderSheet();
         this.app.classList.add('is-sheet-open');
         // Lock the document scroll so iOS Safari + Chrome Android don't fire
@@ -542,19 +668,34 @@
      * Ask the engine to fetch Places data for this POI. Merge selected
      * fields back into the POI in-place so re-renders use the enriched
      * values, then re-render if the sheet is still showing the same POI.
+     *
+     * "In-view" trigger: called from openSheet (marker / list / saved row
+     * click) and from navigateSheet (left/right swipe to prev/next POI).
+     * One network request per POI per session - the engine's localStorage
+     * cache short-circuits repeat calls. Pending-state UI is owned by
+     * renderSheet via the `enrichLoading` context flag.
      */
     SkinController.prototype.requestEnrichment = function (poi) {
-        if (!this.state.instance || !this.state.instance.enrichPoi) return;
+        if (!this.state.instance || !this.state.instance.enrichPoi || !poi) return;
         var self = this;
+        var id = String(poi.id);
         this.state.instance.enrichPoi(poi).then(function (data) {
-            if (!data) return;
+            self.enrichSeen[id] = true;
+            if (!data) {
+                // Still re-render so the placeholder line disappears even
+                // when Places had no record for this POI.
+                if (self.sheet.poi && String(self.sheet.poi.id) === id) {
+                    self.renderSheet();
+                }
+                return;
+            }
             // Map Places fields onto the POI shape the template renders.
             if (data.rating != null)          poi.rating = data.rating;
             if (data.userRatingCount != null) poi.userRatingCount = data.userRatingCount;
             if (data.openNow != null)         poi.open = data.openNow;
             if (data.todaysHours)             poi.hours = data.todaysHours;
             if (data.googleMapsUri)           poi.googleMapsUri = data.googleMapsUri;
-            if (data.websiteUri && !poi.button.url) {
+            if (data.websiteUri && poi.button && !poi.button.url) {
                 poi.button.url = data.websiteUri;
                 if (!poi.button.text) poi.button.text = 'Website';
             }
@@ -565,12 +706,34 @@
             poi.places = data; // full payload available to templates that want it
             // Only re-render if the sheet is still on this POI (user may
             // have already swiped to the next one).
-            if (self.sheet.poi && String(self.sheet.poi.id) === String(poi.id)) {
+            if (self.sheet.poi && String(self.sheet.poi.id) === id) {
                 self.renderSheet();
             }
         });
     };
+
+    /**
+     * True when this POI is missing one of the typically-enriched fields
+     * (rating, hours, open status) AND enrichment is configured AND we
+     * haven't already resolved it this session. Drives the placeholder UI
+     * inside the sheet.
+     */
+    SkinController.prototype.enrichmentPendingFor = function (poi) {
+        var conf = this.cfg.enrichment && this.cfg.enrichment.google;
+        if (!conf || !conf.apiKey || !poi) return false;
+        if (this.enrichSeen[ String(poi.id) ]) return false;
+        // If the POI already carries any enriched field we treat it as "no
+        // need to ask Google" - the placeholder would flash unnecessarily.
+        if (poi.places || poi.rating != null || poi.hours || poi.open != null) return false;
+        return true;
+    };
     SkinController.prototype.closeSheet = function () {
+        // Collapse the notes pull-up first so it doesn't linger behind the
+        // sheet while the sheet animates away.
+        this.app.classList.remove('is-notes-open');
+        var notesPanel = this.target.querySelector('[data-innsight-notes-panel]');
+        if (notesPanel) notesPanel.setAttribute('aria-hidden', 'true');
+
         this.app.classList.remove('is-sheet-open');
         if (root.document && root.document.body) {
             root.document.body.classList.remove('innsight-sheet-locked');
@@ -609,6 +772,9 @@
         }
         // Bind swipe.
         this.bindSheetSwipe(inner);
+        // Bind the personal-note pull-up. Needs the freshly-rendered DOM
+        // because the peek strip is inside the sheet template.
+        this.bindNotesPanel(inner);
     };
 
     /* ── Save / localStorage / toast ─────────────────────────────────────── */
@@ -774,15 +940,64 @@
         ctx.counter = counter;
         ctx.prevName = prev ? (prev.title || prev.name || '') : '';
         ctx.nextName = next ? (next.title || next.name || '') : '';
+        // Loading-placeholder flag: true while a Places request for this POI
+        // is in-flight (or pending). The template renders a small "Looking
+        // up live details…" status row + a placeholder rating chip while
+        // this is on. Re-render on enrichment resolve clears it.
+        ctx.enrichLoading = this.enrichmentPendingFor(poi);
+        // Existing personal-note flag - lets the peek label say "Your note"
+        // instead of the prompt when the user has already typed something.
+        ctx.hasNote = !!this.getNote(poi.id);
         // Stash for navigation.
         this.sheet.siblings = siblings;
         this.sheet.idx = idx;
         return ctx;
     };
 
+    /**
+     * The POIs swipe-left / swipe-right cycles through. Depends on the sheet
+     * context (set by openSheet):
+     *   - 'saved'  - the readSavedList() snapshot (kept tab swipe)
+     *   - 'shared' - the active shared wishlist in sessionStorage
+     *   - 'list'   - the currently filtered + sorted list view
+     *   - 'map'    - POIs sharing the same category/type (default)
+     * Synthesizes minimal POI objects from snapshots when the live POI is
+     * gone (deleted from WP DB), so swipe still works on stale references.
+     */
     SkinController.prototype.siblingsFor = function (poi) {
-        var pois = this.cfg.pois || [];
-        return pois.filter(function (p) { return (p.cat || p.type) === (poi.cat || poi.type); });
+        var ctx = (this.sheet && this.sheet.context) || 'map';
+        var self = this;
+        var live = this.cfg.pois || [];
+        var liveById = {};
+        for (var i = 0; i < live.length; i++) liveById[ String(live[i].id) ] = live[i];
+        function fromEntry(entry) {
+            // Prefer the live POI (full description, fresh fields) when it
+            // still exists; otherwise rebuild a minimal POI from the saved
+            // snapshot so the sheet renders.
+            if (entry && liveById[ String(entry.id) ]) return liveById[ String(entry.id) ];
+            if (!entry) return null;
+            return {
+                id: entry.id, title: entry.title, name: entry.title,
+                cat: entry.cat, type: entry.type,
+                lat: entry.lat, lon: entry.lon,
+                image: entry.image, imageThumb: entry.imageThumb,
+                rating: entry.rating, tag: entry.tag,
+                blurb: entry.blurb, description: entry.description,
+                button: entry.button || { url: '', text: '' },
+                __synthetic: true
+            };
+        }
+        if (ctx === 'saved') {
+            return self.readSavedList().map(fromEntry).filter(Boolean);
+        }
+        if (ctx === 'shared') {
+            return (self.readSharedPicks() || []).map(fromEntry).filter(Boolean);
+        }
+        if (ctx === 'list') {
+            return self.sortPois( self.visiblePois() );
+        }
+        // 'map' / default: same-category siblings.
+        return live.filter(function (p) { return (p.cat || p.type) === (poi.cat || poi.type); });
     };
 
     SkinController.prototype.navigateSheet = function (dir) {
@@ -792,6 +1007,10 @@
         recordSwipeUsed();
         this.sheet.poi = sib[idx];
         this.renderSheet();
+        // Treat swipe as an "in-view" event for the new POI: trigger Places
+        // enrichment if we haven't already resolved this id this session.
+        // The cache short-circuits a real network call when we have one.
+        this.requestEnrichment(this.sheet.poi);
     };
 
     /**
@@ -954,7 +1173,7 @@
                 row.addEventListener('click', function () {
                     var id = row.getAttribute('data-poi-id');
                     var poi = (self.cfg.pois || []).find(function (p) { return String(p.id) === id; });
-                    if (poi) self.openSheet(poi);
+                    if (poi) self.openSheet(poi, { context: 'list' });
                 });
             })(rows[i]);
         }
@@ -992,6 +1211,14 @@
         var savedList = this.readSavedList();
         if (countEl) countEl.textContent = savedList.length;
         if (metaEl)  metaEl.textContent  = savedList.length + (savedList.length === 1 ? ' spot' : ' spots') + ' · expires after 30 days';
+
+        // Reveal the Share button only when there's something to share AND
+        // the share feature isn't disabled in plugin settings.
+        var shareBtn = this.target.querySelector('[data-innsight-share-open]');
+        if (shareBtn) {
+            var shareEnabled = this.shareConfig().enabled;
+            shareBtn.hidden = !shareEnabled || savedList.length === 0;
+        }
 
         if (savedList.length === 0) {
             host.innerHTML = '<div class="in-empty" style="padding:60px 12px 0;text-align:center">'
@@ -1085,7 +1312,9 @@
                     if (e.target === x || x.contains(e.target)) return;
                     var id = row.getAttribute('data-poi-id');
                     var live = (self.cfg.pois || []).find(function (p) { return String(p.id) === id; });
-                    if (live) { self.openSheet(live); return; }
+                    // context:'saved' makes prev/next swipe cycle through the
+                    // user's saved list rather than category siblings.
+                    if (live) { self.openSheet(live, { context: 'saved' }); return; }
                     // Synthesize from saved snapshot.
                     var entry = self.readSaved()[id];
                     if (!entry) return;
@@ -1100,10 +1329,530 @@
                         button: entry.button || { url: '', text: '' },
                         open: true,
                         __synthetic: true
-                    });
+                    }, { context: 'saved' });
                 });
             })(rows[i]);
         }
+    };
+
+    /* ── Personal notes (pull-up panel inside the sheet) ─────────────────── */
+
+    var NOTES_KEY = 'innsight.notes';
+
+    SkinController.prototype.readNotes = function () {
+        try { return JSON.parse(root.localStorage.getItem(NOTES_KEY) || '{}') || {}; }
+        catch (e) { return {}; }
+    };
+
+    SkinController.prototype.writeNotes = function (obj) {
+        try { root.localStorage.setItem(NOTES_KEY, JSON.stringify(obj || {})); } catch (e) {}
+    };
+
+    SkinController.prototype.getNote = function (poiId) {
+        if (poiId == null) return '';
+        var n = this.readNotes()[ String(poiId) ];
+        return n && typeof n.text === 'string' ? n.text : '';
+    };
+
+    /**
+     * Save a note for `poiId`. Empty string deletes the entry to keep
+     * storage compact. Persistence is fire-and-forget; we surface a tiny
+     * "Saved" status indicator so the user is never anxious about whether
+     * their typing was kept.
+     */
+    SkinController.prototype.saveNote = function (poiId, text, statusEl) {
+        if (poiId == null) return;
+        var notes = this.readNotes();
+        var clean = String(text == null ? '' : text);
+        if (clean === '') {
+            delete notes[ String(poiId) ];
+        } else {
+            notes[ String(poiId) ] = { text: clean, updatedAt: Date.now() };
+        }
+        this.writeNotes(notes);
+        if (statusEl) {
+            statusEl.textContent = 'Saved';
+            statusEl.classList.add('is-saved');
+            clearTimeout(this._noteStatusTimer);
+            var self = this;
+            this._noteStatusTimer = setTimeout(function () {
+                if (statusEl && self.sheet.poi) {
+                    statusEl.textContent = 'Auto-saving as you type';
+                    statusEl.classList.remove('is-saved');
+                }
+            }, 1400);
+        }
+    };
+
+    /**
+     * Wire the notes pull-up: pointer drag on the peek strip, click-to-open
+     * fallback, textarea auto-save, drag-down to close. Called once per
+     * sheet render (the strip is part of the sheet template).
+     */
+    SkinController.prototype.bindNotesPanel = function (inner) {
+        var self = this;
+        var peek  = inner.querySelector('[data-innsight-notes-peek]');
+        if (!peek || !this.sheet.poi) return;
+
+        var poiId = String(this.sheet.poi.id);
+        // Build the panel once per sheet render. It's a sibling of the
+        // sheet inner so it can full-cover the sheet without inheriting
+        // its scroll lock. Position is fixed-bottom, animated up.
+        var panel = this.target.querySelector('[data-innsight-notes-panel]');
+        if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
+        panel = document.createElement('div');
+        panel.className = 'in-notes';
+        panel.setAttribute('data-innsight-notes-panel', '');
+        panel.setAttribute('aria-hidden', 'true');
+        panel.innerHTML =
+            '<div class="in-notes__inner">' +
+                '<div class="in-notes__head">' +
+                    '<span class="in-notes__grabber" aria-hidden="true"></span>' +
+                    '<div class="in-notes__title">Personal note</div>' +
+                    '<button type="button" class="in-notes__close" aria-label="Close note">Done</button>' +
+                '</div>' +
+                '<div class="in-notes__sub" data-innsight-notes-status>Auto-saving as you type</div>' +
+                '<textarea class="in-notes__area" data-innsight-notes-area ' +
+                    'placeholder="Anything you want to remember about this place — vibes, prices, what to order, who you went with…" ' +
+                    'rows="6" autocomplete="off" autocorrect="on" spellcheck="true"></textarea>' +
+            '</div>';
+        this.target.appendChild(panel);
+
+        var area   = panel.querySelector('[data-innsight-notes-area]');
+        var status = panel.querySelector('[data-innsight-notes-status]');
+        var closeBtn = panel.querySelector('.in-notes__close');
+        var head   = panel.querySelector('.in-notes__head');
+
+        area.value = self.getNote(poiId);
+
+        // Debounced save - 350ms after the user stops typing. Saving is
+        // synchronous (localStorage) so we don't actually need a network
+        // request; the debounce just avoids hammering JSON.stringify.
+        var saveTimer = null;
+        area.addEventListener('input', function () {
+            if (status) {
+                status.classList.remove('is-saved');
+                status.textContent = 'Saving…';
+            }
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(function () {
+                self.saveNote(poiId, area.value, status);
+                // Reflect "has note" badge state on the peek strip text.
+                var label = peek.querySelector('.in-sheet__notes-peek-label');
+                if (label) label.textContent = area.value ? 'Your note' : 'Add a personal note';
+            }, 350);
+        });
+        // Save on blur too so closing the panel never loses a fresh keystroke.
+        area.addEventListener('blur', function () {
+            clearTimeout(saveTimer);
+            self.saveNote(poiId, area.value, status);
+        });
+
+        function openPanel() {
+            self.app.classList.add('is-notes-open');
+            panel.setAttribute('aria-hidden', 'false');
+            // Defer focus so iOS Safari doesn't fight the slide-up animation.
+            setTimeout(function () { try { area.focus(); } catch (e) {} }, 320);
+        }
+        function closePanel() {
+            self.app.classList.remove('is-notes-open');
+            panel.setAttribute('aria-hidden', 'true');
+            try { area.blur(); } catch (e) {}
+        }
+
+        // Tap / Enter / Space on the peek opens the panel.
+        peek.addEventListener('click', openPanel);
+        peek.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPanel(); }
+        });
+        closeBtn.addEventListener('click', closePanel);
+
+        // Pointer-drag to expand from the peek (drag UP) and to dismiss
+        // from the panel head (drag DOWN). Threshold 60px so it doesn't
+        // accidentally trigger during a tap.
+        var dragStartY = 0, dragging = false, mode = null;
+        function onPeekDown(e) {
+            dragStartY = e.clientY; dragging = true; mode = 'peek-up';
+            try { peek.setPointerCapture(e.pointerId); } catch (er) {}
+        }
+        function onHeadDown(e) {
+            dragStartY = e.clientY; dragging = true; mode = 'panel-down';
+            try { head.setPointerCapture(e.pointerId); } catch (er) {}
+        }
+        function onMove(e) {
+            if (!dragging) return;
+            var dy = e.clientY - dragStartY;
+            if (mode === 'peek-up' && dy < -60) {
+                dragging = false; openPanel();
+            } else if (mode === 'panel-down' && dy > 60) {
+                dragging = false; closePanel();
+            }
+        }
+        function onUp() { dragging = false; mode = null; }
+        peek.addEventListener('pointerdown', onPeekDown);
+        peek.addEventListener('pointermove', onMove);
+        peek.addEventListener('pointerup', onUp);
+        peek.addEventListener('pointercancel', onUp);
+        head.addEventListener('pointerdown', onHeadDown);
+        head.addEventListener('pointermove', onMove);
+        head.addEventListener('pointerup', onUp);
+        head.addEventListener('pointercancel', onUp);
+
+        // Keyboard-aware: when the on-screen keyboard appears, the visual
+        // viewport shrinks. We resize the textarea to fit so the user can
+        // see what they're typing without needing to scroll.
+        if (root.visualViewport) {
+            var resize = function () {
+                if (!self.app.classList.contains('is-notes-open')) return;
+                panel.style.setProperty('--in-notes-h', root.visualViewport.height + 'px');
+            };
+            root.visualViewport.addEventListener('resize', resize);
+            root.visualViewport.addEventListener('scroll', resize);
+            // Initial cleanup on close so the var doesn't linger.
+            self._notesViewportResize = resize;
+        }
+    };
+
+    /* ── Share wishlist (Saved tab) ──────────────────────────────────────── */
+
+    var SHARE_PARAM = 'innsight_share';
+    var SHARED_PICKS_KEY = 'innsight.sharedPicks';   // sessionStorage
+
+    /**
+     * Encode the user's saved POIs into a URL-safe base64 token. We carry
+     * a slim shape (id, title, lat/lon, image, cat/type, tag, button) so the
+     * recipient can preview every spot even when the POI ids don't exist on
+     * their site. Description/blurb deliberately omitted to keep the URL
+     * under typical messaging-app length caps.
+     */
+    SkinController.prototype.encodeSharedPicks = function (savedList) {
+        if (!savedList || !savedList.length) return '';
+        var slim = savedList.map(function (e) {
+            return {
+                i:  e.id,
+                t:  e.title,
+                c:  e.cat || '',
+                ty: e.type || '',
+                la: Number(e.lat),
+                lo: Number(e.lon),
+                im: e.image || '',
+                th: e.imageThumb || e.image || '',
+                ra: e.rating != null ? Number(e.rating) : null,
+                tg: e.tag || '',
+                bu: e.button ? { u: e.button.url || '', x: e.button.text || '' } : null
+            };
+        });
+        try {
+            var json = JSON.stringify(slim);
+            var b64 = root.btoa(unescape(encodeURIComponent(json)));
+            return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        } catch (e) { return ''; }
+    };
+
+    SkinController.prototype.decodeSharedPicks = function (token) {
+        if (!token) return null;
+        try {
+            var b64 = String(token).replace(/-/g, '+').replace(/_/g, '/');
+            while (b64.length % 4) b64 += '=';
+            var json = decodeURIComponent(escape(root.atob(b64)));
+            var slim = JSON.parse(json);
+            if (!Array.isArray(slim)) return null;
+            return slim.map(function (e) {
+                return {
+                    id: e.i, title: e.t, cat: e.c, type: e.ty,
+                    lat: e.la, lon: e.lo,
+                    image: e.im, imageThumb: e.th,
+                    rating: e.ra, tag: e.tg,
+                    button: e.bu ? { url: e.bu.u || '', text: e.bu.x || '' } : { url: '', text: '' }
+                };
+            });
+        } catch (e) { return null; }
+    };
+
+    SkinController.prototype.buildShareUrl = function () {
+        var saved = this.readSavedList();
+        var token = this.encodeSharedPicks(saved);
+        if (!token) return '';
+        var base = root.location.origin + root.location.pathname;
+        return base + (root.location.pathname.indexOf('?') >= 0 ? '&' : '?') + SHARE_PARAM + '=' + token;
+    };
+
+    SkinController.prototype.shareConfig = function () {
+        var s = (this.cfg.ui && this.cfg.ui.share) || {};
+        return {
+            enabled:        s.enabled !== false,
+            inviteMessage:  s.inviteMessage  || "Hey! I'm sharing my travel wishlist with you 👇",
+            popupTitle:     (s.popup && s.popup.title)        || 'A friend is sharing travel tips',
+            popupBody:      (s.popup && s.popup.body)         || "They've curated a wishlist just for you. Want a peek?",
+            previewLabel:   (s.popup && s.popup.previewLabel) || 'Just preview',
+            saveAllLabel:   (s.popup && s.popup.saveAllLabel) || 'Save them all',
+            chipLabel:      s.chipLabel      || "Friend's picks"
+        };
+    };
+
+    SkinController.prototype.bindShareControls = function () {
+        var self = this;
+        var openBtn  = this.target.querySelector('[data-innsight-share-open]');
+        var menu     = this.target.querySelector('[data-innsight-share-menu]');
+        var backdrop = this.target.querySelector('[data-innsight-share-backdrop]');
+        var closeBtn = this.target.querySelector('[data-innsight-share-close]');
+        var nativeBtn = this.target.querySelector('[data-innsight-share-channel="native"]');
+
+        // Show the native-share tile only when supported.
+        if (nativeBtn && root.navigator && root.navigator.share) nativeBtn.hidden = false;
+        // Hide the share button entirely if disabled in settings.
+        if (!this.shareConfig().enabled && openBtn) {
+            openBtn.style.display = 'none';
+        }
+
+        function openMenu() {
+            var saved = self.readSavedList();
+            if (!saved.length) {
+                self.showToast('Save a few spots first');
+                return;
+            }
+            var countEl = self.target.querySelector('[data-innsight-share-count]');
+            if (countEl) countEl.textContent = saved.length + ' ' + (saved.length === 1 ? 'spot' : 'spots') + ' to share';
+            self.app.classList.add('is-share-open');
+            if (menu) menu.setAttribute('aria-hidden', 'false');
+            if (backdrop) backdrop.setAttribute('aria-hidden', 'false');
+        }
+        function closeMenu() {
+            self.app.classList.remove('is-share-open');
+            if (menu) menu.setAttribute('aria-hidden', 'true');
+            if (backdrop) backdrop.setAttribute('aria-hidden', 'true');
+        }
+
+        if (openBtn) openBtn.addEventListener('click', openMenu);
+        if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+        if (backdrop) backdrop.addEventListener('click', closeMenu);
+
+        // Channel buttons.
+        var tiles = this.target.querySelectorAll('[data-innsight-share-channel]');
+        for (var i = 0; i < tiles.length; i++) {
+            (function (tile) {
+                tile.addEventListener('click', function () {
+                    var channel = tile.getAttribute('data-innsight-share-channel');
+                    self.dispatchShare(channel);
+                    closeMenu();
+                });
+            })(tiles[i]);
+        }
+    };
+
+    /**
+     * Dispatch a share through the chosen channel. Native uses the Web
+     * Share API (fall back to copy on any failure); WhatsApp / Email /
+     * Facebook open vendor URLs in a new tab; copy writes the link to the
+     * clipboard with a toast confirmation.
+     */
+    SkinController.prototype.dispatchShare = function (channel) {
+        var url = this.buildShareUrl();
+        if (!url) { this.showToast('Save a few spots first'); return; }
+        var msg = this.shareConfig().inviteMessage;
+        var combined = msg + '\n\n' + url;
+        var self = this;
+
+        switch (channel) {
+            case 'native':
+                if (root.navigator && root.navigator.share) {
+                    root.navigator.share({ title: 'My wishlist', text: msg, url: url }).catch(function () {});
+                } else {
+                    self.copyToClipboard(url);
+                }
+                break;
+            case 'whatsapp':
+                root.open('https://wa.me/?text=' + encodeURIComponent(combined), '_blank', 'noopener');
+                break;
+            case 'facebook':
+                root.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url) + '&quote=' + encodeURIComponent(msg), '_blank', 'noopener');
+                break;
+            case 'email':
+                root.location.href = 'mailto:?subject=' + encodeURIComponent('My travel wishlist') + '&body=' + encodeURIComponent(combined);
+                break;
+            case 'copy':
+                self.copyToClipboard(url);
+                break;
+        }
+    };
+
+    SkinController.prototype.copyToClipboard = function (text) {
+        var self = this;
+        if (root.navigator && root.navigator.clipboard && root.navigator.clipboard.writeText) {
+            root.navigator.clipboard.writeText(text).then(function () { self.showToast('Link copied'); }, function () { self.fallbackCopy(text); });
+        } else {
+            self.fallbackCopy(text);
+        }
+    };
+    SkinController.prototype.fallbackCopy = function (text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); this.showToast('Link copied'); } catch (e) {}
+        document.body.removeChild(ta);
+    };
+
+    /* ── Receive popup (recipient's flow) ────────────────────────────────── */
+
+    SkinController.prototype.bindReceiveControls = function () {
+        var self = this;
+        var receive = this.target.querySelector('[data-innsight-receive]');
+        if (!receive) return;
+        var actions = receive.querySelectorAll('[data-innsight-receive-action]');
+        for (var i = 0; i < actions.length; i++) {
+            (function (btn) {
+                btn.addEventListener('click', function () {
+                    var action = btn.getAttribute('data-innsight-receive-action');
+                    self.handleReceiveChoice(action);
+                });
+            })(actions[i]);
+        }
+    };
+
+    SkinController.prototype.consumeShareUrl = function () {
+        try {
+            var qs = root.location.search || '';
+            var match = qs.match(new RegExp('[?&]' + SHARE_PARAM + '=([^&]+)'));
+            if (!match) return;
+            var picks = this.decodeSharedPicks(decodeURIComponent(match[1]));
+            if (!picks || !picks.length) return;
+            // Stash for the session so the dancing chip survives navigation
+            // between tabs (but not a full new tab open).
+            try { root.sessionStorage.setItem(SHARED_PICKS_KEY, JSON.stringify(picks)); } catch (e) {}
+            this.showReceivePopup(picks);
+            // Clean the URL so a manual reload doesn't re-pop the modal.
+            if (root.history && root.history.replaceState) {
+                var clean = qs.replace(new RegExp('([?&])' + SHARE_PARAM + '=[^&]+&?'), '$1').replace(/[?&]$/, '');
+                root.history.replaceState({}, '', root.location.pathname + clean + root.location.hash);
+            }
+        } catch (e) {}
+    };
+
+    SkinController.prototype.readSharedPicks = function () {
+        try {
+            var raw = root.sessionStorage.getItem(SHARED_PICKS_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    };
+
+    SkinController.prototype.showReceivePopup = function (picks) {
+        var receive = this.target.querySelector('[data-innsight-receive]');
+        if (!receive) return;
+        var cfg = this.shareConfig();
+        var titleEl = receive.querySelector('[data-innsight-receive-title]');
+        var bodyEl  = receive.querySelector('[data-innsight-receive-body]');
+        var countEl = receive.querySelector('[data-innsight-receive-count]');
+        var prevBtn = receive.querySelector('[data-innsight-receive-action="preview"]');
+        var saveBtn = receive.querySelector('[data-innsight-receive-action="save"]');
+        if (titleEl) titleEl.textContent = cfg.popupTitle;
+        if (bodyEl)  bodyEl.textContent  = cfg.popupBody;
+        if (countEl) countEl.textContent = picks.length;
+        if (prevBtn) prevBtn.textContent = cfg.previewLabel;
+        if (saveBtn) saveBtn.textContent = cfg.saveAllLabel;
+        receive.setAttribute('aria-hidden', 'false');
+        this.app.classList.add('is-receive-open');
+    };
+
+    SkinController.prototype.hideReceivePopup = function () {
+        var receive = this.target.querySelector('[data-innsight-receive]');
+        if (receive) receive.setAttribute('aria-hidden', 'true');
+        this.app.classList.remove('is-receive-open');
+    };
+
+    SkinController.prototype.handleReceiveChoice = function (action) {
+        var picks = this.readSharedPicks() || [];
+        if (action === 'save') {
+            // Save them all into the user's localStorage. We piggy-back on
+            // toggleSavedPoi by synthesizing a POI-shaped object per pick.
+            var saved = this.readSaved();
+            var added = 0;
+            picks.forEach(function (p) {
+                if (saved[ String(p.id) ]) return; // already saved
+                added++;
+                saved[ String(p.id) ] = {
+                    id: p.id, title: p.title, cat: p.cat, type: p.type,
+                    lat: p.lat, lon: p.lon,
+                    image: p.image, imageThumb: p.imageThumb,
+                    rating: p.rating, tag: p.tag,
+                    blurb: '', description: '',
+                    button: p.button || { url: '', text: '' },
+                    savedAt: Date.now()
+                };
+            });
+            this.writeSaved(saved);
+            this.showToast(added + ' spot' + (added === 1 ? '' : 's') + ' saved');
+            this.hideReceivePopup();
+            this.setRoute('save');
+        } else {
+            // Preview path: keep the picks in sessionStorage, show the
+            // dancing chip in the filter bar, drop into the map view.
+            this.hideReceivePopup();
+            this.activateSharedPicksChip();
+            this.setRoute('map');
+        }
+    };
+
+    /* ── Dancing 'Friend's picks' chip ───────────────────────────────────── */
+
+    SkinController.prototype.restoreSharedPicksChip = function () {
+        if (this.readSharedPicks()) this.activateSharedPicksChip();
+    };
+
+    SkinController.prototype.activateSharedPicksChip = function () {
+        var picks = this.readSharedPicks();
+        if (!picks || !picks.length) return;
+        var label = this.shareConfig().chipLabel + ' (' + picks.length + ')';
+        var hosts = [
+            this.target.querySelector('[data-innsight-chips]'),
+            this.target.querySelector('[data-innsight-list-chips]')
+        ].filter(Boolean);
+        var self = this;
+        hosts.forEach(function (host) {
+            // Remove an existing chip first so we don't stack duplicates on
+            // re-activation (e.g. after tab navigation).
+            var existing = host.querySelector('.in-chip--shared');
+            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+            var btn = document.createElement('button');
+            btn.className = 'in-chip in-chip--shared in-chip--dance';
+            btn.type = 'button';
+            btn.setAttribute('role', 'tab');
+            btn.setAttribute('data-cat', '__shared');
+            btn.setAttribute('aria-pressed', self.cat === '__shared' ? 'true' : 'false');
+            btn.innerHTML = '<span class="in-chip__heart" aria-hidden="true">♥</span>' + self.escape(label) + '<span class="in-chip__close" aria-label="Dismiss" data-shared-dismiss>×</span>';
+            btn.addEventListener('click', function (e) {
+                if (e.target && e.target.getAttribute('data-shared-dismiss') !== null) {
+                    self.dismissSharedPicks();
+                    return;
+                }
+                self.setCategoryShared();
+            });
+            // Put it first so it's hard to miss.
+            host.insertBefore(btn, host.firstChild);
+        });
+    };
+
+    SkinController.prototype.dismissSharedPicks = function () {
+        try { root.sessionStorage.removeItem(SHARED_PICKS_KEY); } catch (e) {}
+        var chips = this.target.querySelectorAll('.in-chip--shared');
+        for (var i = 0; i < chips.length; i++) {
+            if (chips[i].parentNode) chips[i].parentNode.removeChild(chips[i]);
+        }
+        if (this.cat === '__shared') this.setCategory('all');
+    };
+
+    SkinController.prototype.setCategoryShared = function () {
+        this.cat = '__shared';
+        var chips = this.target.querySelectorAll('[data-cat]');
+        for (var i = 0; i < chips.length; i++) {
+            chips[i].setAttribute('aria-pressed', chips[i].getAttribute('data-cat') === '__shared' ? 'true' : 'false');
+        }
+        // Drop into List view so the user actually sees the curated picks
+        // (the dancing chip + a List filter is the user-friendly outcome).
+        if (this.route !== 'list') this.setRoute('list');
+        else this.renderList();
+        this.updateCounts();
     };
 
     /**

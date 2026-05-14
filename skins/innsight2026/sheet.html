@@ -29,11 +29,14 @@
     <span class="in-sheet__dist">{{dist}}</span>
     {{#if hours}}<span class="in-sheet__sep">·</span>
     <span class="in-sheet__open" data-open="{{open}}">{{openLabel}}</span>{{/if}}
+    {{#if enrichLoading}}<span class="in-sheet__sep">·</span>
+    <span class="in-sheet__enriching"><span class="in-sheet__enriching-dot" aria-hidden="true"></span>Looking up live details…</span>{{/if}}
 </div>
 
 <h2 class="in-sheet__title">{{title}}</h2>
 
 {{#if hours}}<div class="in-sheet__hours">{{hours}}</div>{{/if}}
+{{#if enrichLoading}}<div class="in-sheet__hours in-sheet__hours--placeholder" aria-hidden="true">&nbsp;</div>{{/if}}
 
 {{#if blurb}}<div class="in-sheet__blurb">{{{blurb}}}</div>{{/if}}
 
@@ -42,6 +45,7 @@
 <div class="in-sheet__vibewrap">
     {{#each vibeTags}}<span class="in-sheet__tag">{{value}}</span>{{/each}}
     {{#if ratingLabel}}<span class="in-sheet__tag in-sheet__tag--rating">★ {{ratingLabel}}</span>{{/if}}
+    {{#if enrichLoading}}{{#unless ratingLabel}}<span class="in-sheet__tag in-sheet__tag--placeholder" aria-hidden="true">★ —</span>{{/unless}}{{/if}}
 </div>
 {{/if}}
 
@@ -54,3 +58,21 @@
 {{#if googleMapsUri}}
 <a class="in-sheet__gmaps" href="{{googleMapsUri}}" target="_blank" rel="noopener">View on Google Maps →</a>
 {{/if}}
+
+<!-- Personal-note pull-up. The strip sits at the bottom of the sheet,
+     showing only a small downward arrow + label + the very top edge of the
+     textarea. Tap or drag UP on the strip expands the notes panel over
+     the sheet (drag DOWN on the panel header collapses back). Drafts
+     auto-save to localStorage as the user types. -->
+<div class="in-sheet__notes-peek" data-innsight-notes-peek
+     role="button" tabindex="0" aria-label="Add a personal note">
+    <span class="in-sheet__notes-peek-arrow" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 4v9M5.5 8.5L10 13l4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </span>
+    <span class="in-sheet__notes-peek-label">
+        {{#if hasNote}}Your note{{else}}Add a personal note{{/if}}
+    </span>
+    <span class="in-sheet__notes-peek-edge" aria-hidden="true"></span>
+</div>

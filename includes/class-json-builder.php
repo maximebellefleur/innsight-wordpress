@@ -51,6 +51,10 @@ final class JsonBuilder {
 
         $config = array(
             'version'      => 1,
+            // Plugin release version - the engine's checkVersion() compares
+            // it to localStorage on every boot so a new release wipes any
+            // stale transient cache (without touching saved POIs / notes).
+            'pluginVersion' => defined( 'INNSIGHT_VERSION' ) ? INNSIGHT_VERSION : '0',
             'map'          => array(
                 'center'       => array(
                     'lat' => (float) $intermediate['center']['lat'],
@@ -86,6 +90,7 @@ final class JsonBuilder {
                 'kmlExport'    => ! empty( $settings['kml_export'] ),
                 'layerControl' => array( 'position' => 'bottomright', 'collapsed' => false ),
                 'liveLocation' => $this->build_live_location_config( $settings ),
+                'share'        => $this->build_share_config( $settings ),
             ),
             'pois'         => array_map( array( $this, 'shape_poi' ), $intermediate['pois'] ),
             'paths'        => array_map( array( $this, 'shape_path' ), $intermediate['paths'] ),
@@ -203,6 +208,25 @@ final class JsonBuilder {
          * @return string
          */
         return (string) apply_filters( 'innsight/visitor_country', $detected );
+    }
+
+    /**
+     * Share-wishlist UI config block. Carries the editable copy strings
+     * (popup title/body/button labels, dancing chip label) plus the
+     * "feature enabled" toggle. Skin reads it via cfg.ui.share.
+     */
+    private function build_share_config( array $settings ): array {
+        return array(
+            'enabled'       => ! empty( $settings['share_enabled'] ?? 1 ),
+            'inviteMessage' => (string) ( $settings['share_invite_message'] ?? '' ),
+            'chipLabel'     => (string) ( $settings['share_chip_label'] ?? "Friend's picks" ),
+            'popup'         => array(
+                'title'        => (string) ( $settings['share_popup_title']    ?? 'A friend is sharing travel tips' ),
+                'body'         => (string) ( $settings['share_popup_body']     ?? "They've curated a wishlist just for you. Want a peek?" ),
+                'previewLabel' => (string) ( $settings['share_preview_label']  ?? 'Just preview' ),
+                'saveAllLabel' => (string) ( $settings['share_save_all_label'] ?? 'Save them all' ),
+            ),
+        );
     }
 
     private function build_enrichment_config( array $settings ): array {

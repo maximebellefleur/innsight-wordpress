@@ -73,6 +73,19 @@ final class Settings {
             // Render mode for the shortcode: 'inline' (emit window.INNSIGHT_DATA + skin partials)
             // or 'fetch' (engine fetches /wp-json/innsight/v1/map).
             'render_mode'          => 'inline',
+
+            // Share-wishlist feature (innsight2026 only). When enabled, the
+            // Saved tab gets a top-right Share button that lets the visitor
+            // ship their saved list as a tokenized URL. The recipient sees
+            // a "your friend is sharing travel tips" popup with editable
+            // copy below.
+            'share_enabled'           => 1,
+            'share_invite_message'    => "Hey! I'm sharing my travel wishlist with you 👇",
+            'share_popup_title'       => 'A friend is sharing travel tips',
+            'share_popup_body'        => "They've curated a wishlist just for you. Want a peek?",
+            'share_preview_label'     => 'Just preview',
+            'share_save_all_label'    => 'Save them all',
+            'share_chip_label'        => "Friend's picks",
         );
     }
 
@@ -125,6 +138,15 @@ final class Settings {
         $clean['geocoder_email']       = isset( $raw['geocoder_email'] ) ? sanitize_email( $raw['geocoder_email'] ) : '';
         $clean['geocoder_cache_hours'] = isset( $raw['geocoder_cache_hours'] ) ? max( 1, (int) $raw['geocoder_cache_hours'] ) : $defaults['geocoder_cache_hours'];
         $clean['render_mode']          = in_array( $raw['render_mode'] ?? '', array( 'inline', 'fetch' ), true ) ? $raw['render_mode'] : 'inline';
+
+        // Share-wishlist copy. Plain-text fields the recipient sees in the
+        // receive popup + the dancing chip label. Stripped to avoid HTML
+        // injection inside the bottom sheet.
+        $clean['share_enabled']        = ! empty( $raw['share_enabled'] ) ? 1 : 0;
+        $share_text_keys = array( 'share_invite_message', 'share_popup_title', 'share_popup_body', 'share_preview_label', 'share_save_all_label', 'share_chip_label' );
+        foreach ( $share_text_keys as $sk ) {
+            $clean[ $sk ] = isset( $raw[ $sk ] ) ? wp_strip_all_tags( (string) $raw[ $sk ] ) : (string) ( $defaults[ $sk ] ?? '' );
+        }
 
         return $clean;
     }

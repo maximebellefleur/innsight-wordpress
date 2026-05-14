@@ -83,6 +83,7 @@ final class Admin {
         add_settings_section( 'innsight_design', __( 'Design', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_enrichment', __( 'Google Places enrichment', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_render', __( 'Render mode & UI', 'innsight' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'innsight_share', __( 'Share wishlist', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_geocoder', __( 'Geocoder', 'innsight' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'engine_source', __( 'Engine source', 'innsight' ), 'innsight_engine', 'render_engine_source' );
@@ -106,6 +107,14 @@ final class Admin {
         $this->add_field( 'live_location', __( 'Show user\'s live location', 'innsight' ), 'innsight_render', 'render_checkbox', __( 'Asks the browser for the user\'s coordinates and drops a pulsing marker on the map.', 'innsight' ) );
         $this->add_field( 'live_location_icon', __( 'Live location icon', 'innsight' ), 'innsight_render', 'render_text', __( 'Single character (emoji works best). Default: 🎒. Leave empty for a colored dot.', 'innsight' ) );
         $this->add_field( 'live_location_countries', __( 'Allowed countries', 'innsight' ), 'innsight_render', 'render_text', __( 'Comma-separated ISO country codes (e.g. CH, FR, DE). The geolocation prompt only fires when the visitor\'s detected country is in this list. Detection uses the CDN-provided header (Cloudflare CF-IPCountry, etc). Leave empty to prompt every visitor. Default: CH (Switzerland only).', 'innsight' ) );
+
+        $this->add_field( 'share_enabled', __( 'Enable Share Wishlist button', 'innsight' ), 'innsight_share', 'render_checkbox', __( 'Adds a top-right Share button on the Saved tab. The visitor can ship their saved spots through native share / WhatsApp / Facebook / Email / copy-link.', 'innsight' ) );
+        $this->add_field( 'share_invite_message', __( 'Invite message', 'innsight' ), 'innsight_share', 'render_text', __( 'Pre-filled message body when the visitor shares (WhatsApp / Email).', 'innsight' ) );
+        $this->add_field( 'share_popup_title', __( 'Receive popup - title', 'innsight' ), 'innsight_share', 'render_text', __( 'Headline shown to recipients when they land via a share link.', 'innsight' ) );
+        $this->add_field( 'share_popup_body', __( 'Receive popup - body', 'innsight' ), 'innsight_share', 'render_textarea' );
+        $this->add_field( 'share_preview_label', __( 'Receive popup - preview button', 'innsight' ), 'innsight_share', 'render_text' );
+        $this->add_field( 'share_save_all_label', __( 'Receive popup - save-all button', 'innsight' ), 'innsight_share', 'render_text' );
+        $this->add_field( 'share_chip_label', __( "Friend's-picks chip label", 'innsight' ), 'innsight_share', 'render_text', __( 'Label shown on the dancing chip in the filter bar after the recipient picks "Just preview".', 'innsight' ) );
 
         $this->add_field( 'geocoder_email', __( 'Nominatim contact email', 'innsight' ), 'innsight_geocoder', 'render_text', __( 'Sent in the User-Agent header per Nominatim usage policy.', 'innsight' ) );
         $this->add_field( 'geocoder_cache_hours', __( 'Geocoder cache TTL (hours)', 'innsight' ), 'innsight_geocoder', 'render_number' );
@@ -217,5 +226,9 @@ final class Admin {
 
     public function render_checkbox( string $key, $value ): void {
         echo '<label><input type="checkbox" name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '" value="1" ' . checked( ! empty( $value ), true, false ) . ' /> ' . esc_html__( 'Enabled', 'innsight' ) . '</label>';
+    }
+
+    public function render_textarea( string $key, $value ): void {
+        echo '<textarea class="large-text" rows="3" name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '">' . esc_textarea( (string) $value ) . '</textarea>';
     }
 }

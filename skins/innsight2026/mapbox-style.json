@@ -140,12 +140,16 @@
             "id": "road-label",
             "type": "symbol",
             "source": "composite",
-            "source-layer": "road_label",
+            "source-layer": "road",
             "minzoom": 13,
+            "filter": ["all",
+                ["has", "name"],
+                ["match", ["get", "class"], ["motorway", "trunk", "primary", "secondary", "tertiary", "street"], true, false]
+            ],
             "layout": {
                 "symbol-placement": "line",
-                "text-field": ["upcase", ["get", "name"]],
-                "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
+                "text-field": ["upcase", ["coalesce", ["get", "name_en"], ["get", "name"]]],
+                "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
                 "text-size": ["interpolate", ["linear"], ["zoom"], 13, 9, 18, 13],
                 "text-letter-spacing": 0.08,
                 "text-max-angle": 30
@@ -164,7 +168,7 @@
             "filter": ["==", ["get", "maki"], "park"],
             "layout": {
                 "text-field": ["get", "name"],
-                "text-font": ["DIN Pro Italic", "Arial Unicode MS Italic"],
+                "text-font": ["Open Sans Italic", "Arial Unicode MS Regular"],
                 "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 14]
             },
             "paint": {
@@ -184,7 +188,7 @@
             ],
             "layout": {
                 "text-field": ["upcase", ["get", "name"]],
-                "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
+                "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
                 "text-letter-spacing": 0.12,
                 "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 15, 13]
             },
