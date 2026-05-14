@@ -1495,3 +1495,47 @@ body.innsight-sheet-locked {
 @media (prefers-reduced-motion: reduce) {
     .in-chip--dance, .in-sheet__notes-peek-arrow { animation: none !important; }
 }
+
+/* ── v0.5.1 - Desktop sheet (≥ 900px) ────────────────────────────────────
+ *
+ * On wide screens the bottom sheet stretching edge-to-edge looks wrong
+ * (a 1900px-wide hero photo dominates the screen). Constrain the inner
+ * card to ~50% of the viewport, centred horizontally, with a modest
+ * height bump on the hero so the image still reads as a poster. The
+ * outer .in-sheet stays full-width so the slide-up transition / backdrop
+ * keep working unchanged.
+ */
+@media (min-width: 900px) {
+    .in-sheet__inner {
+        width: 56%;
+        max-width: 720px;
+        min-width: 480px;
+        margin: 0 auto;
+        max-height: 80vh;
+        border-radius: 28px 28px 0 0;
+        padding: 14px 28px 40px;
+    }
+    .in-hero { height: 240px; border-radius: 26px; }
+    .in-hero__initial { font-size: 92px; }
+    .in-sheet__title { font-size: 44px; }
+    .in-sheet__blurb { font-size: 16px; }
+    /* Notes panel / share menu / receive popup also constrain so they
+     * align with the sheet's centred footprint. */
+    .in-notes {
+        width: 56%; max-width: 720px; min-width: 480px;
+        left: 50%; right: auto; transform: translate(-50%, 102%);
+        border-radius: 28px 28px 0 0;
+    }
+    .in-app.is-notes-open .in-notes { transform: translate(-50%, 0); }
+    .in-share-menu__inner {
+        width: 56%; max-width: 720px; min-width: 480px;
+        margin: 0 auto;
+        border-radius: 28px 28px 0 0;
+    }
+}
+
+@media (min-width: 1280px) {
+    .in-sheet__inner { width: 50%; max-width: 760px; }
+    .in-notes        { width: 50%; max-width: 760px; }
+    .in-share-menu__inner { width: 50%; max-width: 760px; }
+}

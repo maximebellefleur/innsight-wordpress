@@ -1,4 +1,12 @@
 # Changelog
+## 0.5.1 - 2026-05-14
+
+- **Desktop sheet sizing.** On viewports ≥ 900px the bottom sheet,
+  notes panel, and share menu now constrain to ~56% width (max 720px)
+  centered horizontally, with a taller hero (240px) and bigger
+  display title. On ≥ 1280px we tighten further to 50% / 760px max.
+  Fixes the edge-to-edge hero-image bloat reported on desktop.
+
 ## 0.5.0 - 2026-05-14
 
 Big release: share-wishlist, personal notes, swipe-by-context, in-view
