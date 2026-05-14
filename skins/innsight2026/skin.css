@@ -307,7 +307,11 @@
     position: absolute;
     left: 12px; right: 12px;
     bottom: 22px;
-    z-index: 70;
+    /* z-index needs to beat aggressive theme floats like sticky "BOOK
+     * NOW" buttons (Balmers theme uses z-index 9999 on its CTA). The
+     * tab bar is inside .in-app so we don't pollute the page stack -
+     * just tall enough to win inside our own root. */
+    z-index: 9999;
     height: 58px;
     border-radius: 999px;
     background: var(--in-bg) !important;
@@ -315,6 +319,9 @@
     box-shadow: 3px 3px 0 var(--in-ink);
     display: flex; align-items: center;
     padding: 4px;
+    /* Force this layer to claim pointer events even if a theme overlay
+     * tries to swallow them with pointer-events:auto on a higher node. */
+    pointer-events: auto;
 }
 .in-tab {
     flex: 1;

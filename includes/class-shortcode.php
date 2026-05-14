@@ -154,11 +154,29 @@ final class Shortcode {
         // attaches `.init`. A `typeof Innsight === "undefined"` check passes
         // too early (Innsight is "object", not "undefined") and we'd call a
         // function that doesn't exist yet. Wait for `.init` specifically.
-        // Skin's checkVersion() reads INNSIGHT_PARTIALS_VERSION (set above)
-        // and compares to its baked-in SKIN_VERSION; a mismatch forces a
-        // one-time reload with cache-bypass to repair the cached-HTML +
-        // fresh-JS state.
-        return $partials_block . '<script>(function(){function _go(){if(!window.Innsight||typeof window.Innsight.init!=="function"){return setTimeout(_go,30);}' . $config_js . $init_js . '}_go();})();</script>';
+        //
+        // ALSO wait for the chosen skin to be registered on
+        // `Innsight._skins[name]`. On slow networks skin.js (loaded async
+        // after the engine) can still be downloading when the bootstrap
+        // fires - the engine then renders pins from its own data but
+        // silently no-ops the skin setup, leaving the user with a map full
+        // of pins but no interactive chrome / chips / count / tap-to-open.
+        // The polling continues until both are ready; max 30s safety
+        // ceiling so we don't loop forever on a broken deploy.
+        $skin_name = isset( $config['skin']['name'] ) ? (string) $config['skin']['name'] : 'innsight2026';
+        $ready_check =
+            '(function(){function _go(){var I=window.Innsight;'
+            . 'if(!I||typeof I.init!=="function"){return _retry();}'
+            . 'if(!I._skins||!I._skins[' . wp_json_encode( $skin_name ) . ']){return _retry();}'
+            . $config_js . $init_js
+            . '}'
+            . 'var _tries=0;'
+            . 'function _retry(){if(_tries++>1000){'
+            . '  if(window.console)console.error("[innsight] init timeout - engine or skin failed to load. Check enqueued scripts.");'
+            . '  return;'
+            . '}setTimeout(_go,30);}'
+            . '_go();})();';
+        return $partials_block . '<script>' . $ready_check . '</script>';
     }
 
     private function render_fetch_bootstrap( string $dom_id, array $atts ): string {

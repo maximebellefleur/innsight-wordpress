@@ -1,4 +1,42 @@
 # Changelog
+## 0.5.11 - 2026-05-14
+
+Slow-network race fix + theme-overlay z-index + visible boot errors.
+
+### Root cause of "sometimes loads, sometimes inert"
+
+The engine and skin load as separate `<script>` tags. The inline
+bootstrap waited for `Innsight.init` to exist (= engine main script
+loaded) but NOT for the skin to register on `Innsight._skins[name]`.
+On slow networks skin.js (loaded async after the engine) was still
+downloading when the bootstrap fired. The engine then:
+
+1. Rendered the map.
+2. Rendered the pins (from its own config copy).
+3. Reached "call `_skins[name].setup()`".
+4. Skin not yet registered → silently no-op'd.
+5. skin.js finished loading 200ms later → registered itself, but
+   nothing was waiting for it → setup never ran.
+
+User sees pins, no chrome interactions, no errors. Refresh → if the
+cache makes skin.js arrive faster, it works.
+
+### Fix
+
+- **Bootstrap polls for both** `Innsight.init` AND
+  `Innsight._skins[chosenSkinName]` before calling `init()`. The poll
+  has a 30-second ceiling (1000 × 30ms) with a console.error if it
+  times out so a broken deploy is loud, not silent.
+- **`Innsight._skins.innsight2026.setup` wrapped in try/catch.** Any
+  thrown error now shows a red notice inside the map container and
+  logs to `console.error` — a partially-rendered inert UI never
+  happens silently again.
+- **Tab bar z-index raised to 9999** (was 70) with explicit
+  `pointer-events: auto`. The Balmers theme's sticky "BOOK NOW"
+  button uses z-index 9999 and was covering the Saved tab in the
+  screenshot you sent. Tab bar lives inside `.in-app` so this
+  doesn't pollute the page stacking context.
+
 ## 0.5.10 - 2026-05-14
 
 Sheet swipe stuck-card fix.

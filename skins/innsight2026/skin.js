@@ -54,9 +54,29 @@
 
     Innsight._skins.innsight2026 = {
         setup: function (state) {
-            var ctx = new SkinController(state);
-            ctx.boot();
-            state.skinController = ctx;
+            try {
+                var ctx = new SkinController(state);
+                ctx.boot();
+                state.skinController = ctx;
+            } catch (e) {
+                // Surface the failure prominently so a "loaded but inert"
+                // map never happens silently. Without this catch, a single
+                // thrown error mid-boot would leave the chrome rendered
+                // but nothing wired - pins visible, no taps, no errors
+                // because the error vanished into the script tag.
+                if (root && root.console) {
+                    root.console.error('[innsight] skin setup failed:', e);
+                }
+                try {
+                    var t = state && state.target;
+                    if (t) {
+                        var notice = document.createElement('div');
+                        notice.style.cssText = 'position:absolute;top:10px;left:10px;right:10px;z-index:999;padding:10px 14px;background:#fff;border:1.5px solid #B43B3B;border-radius:8px;color:#B43B3B;font:13px system-ui;box-shadow:2px 2px 0 #B43B3B';
+                        notice.textContent = 'Innsight: skin initialisation failed - ' + (e && e.message ? e.message : 'unknown error') + '. Check console.';
+                        t.appendChild(notice);
+                    }
+                } catch (_) {}
+            }
         }
     };
 
