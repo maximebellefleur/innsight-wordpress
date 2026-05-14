@@ -405,7 +405,10 @@
     background: rgba(15, 15, 15, 0.45);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    z-index: 80;
+    /* Modal layers must beat the tab bar (z-index 9999, raised to
+     * defeat theme floats). Sheet stack starts at 10000 so the tab
+     * bar can't poke through over the sheet content / actions. */
+    z-index: 10000;
     opacity: 0;
     pointer-events: none;
     transition: opacity 220ms ease;
@@ -417,7 +420,7 @@
 .in-sheet {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    z-index: 81;
+    z-index: 10001;
     transform: translateY(110%);
     transition: transform 280ms cubic-bezier(.32, .72, .2, 1);
     will-change: transform;
@@ -1389,7 +1392,10 @@ body.innsight-sheet-locked {
     position: absolute;
     left: 0; right: 0; bottom: 0;
     height: var(--in-notes-h, 100%);
-    z-index: 90;
+    /* Above the sheet (10001) so the notes editor fully covers the
+     * sheet's content + actions when open. Tab bar (9999) stays
+     * underneath - the notes editor is modal. */
+    z-index: 10005;
     background: var(--in-sheet);
     border-top-left-radius: 28px;
     border-top-right-radius: 28px;
@@ -1514,7 +1520,9 @@ body.innsight-sheet-locked {
     background: rgba(15,15,15,0.45);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    z-index: 100;
+    /* Share is launched from the Saved tab so it must sit above the
+     * tab bar (9999) and above any open sheet/notes (10001/10005). */
+    z-index: 10010;
     opacity: 0;
     pointer-events: none;
     transition: opacity 220ms ease;
@@ -1523,7 +1531,7 @@ body.innsight-sheet-locked {
 .in-share-menu {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    z-index: 101;
+    z-index: 10011;
     transform: translateY(110%);
     transition: transform 280ms cubic-bezier(.32,.72,.2,1);
     will-change: transform;
@@ -1598,7 +1606,9 @@ body.innsight-sheet-locked {
 /* ── v0.5.0 - Receive popup (recipient lands via share URL) ─────────────── */
 .in-receive {
     position: absolute; inset: 0;
-    z-index: 110;
+    /* Top-most modal: appears on landing from a share URL, must
+     * cover everything else (sheet, notes, share menu). */
+    z-index: 10020;
     display: flex; align-items: center; justify-content: center;
     padding: 20px;
     opacity: 0;

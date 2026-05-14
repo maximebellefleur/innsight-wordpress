@@ -1,4 +1,17 @@
 # Changelog
+## 0.5.13 - 2026-05-14
+
+- **Modal z-index stack reordered above the tab bar.** When the tab
+  bar was raised to z-index 9999 in 0.5.5 (to defeat theme overlays
+  like the Balmers "BOOK NOW" sticky button), it started covering
+  the bottom sheet's actions row + the notes editor. Modals now
+  layer cleanly above the tab bar:
+  - sheet backdrop: 10000
+  - sheet: 10001
+  - notes panel: 10005
+  - share backdrop / menu: 10010 / 10011
+  - receive popup: 10020
+
 ## 0.5.12 - 2026-05-14
 
 - **"More info" replaces "Directions"** as the sheet's fallback
