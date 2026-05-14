@@ -650,6 +650,10 @@
         this.sheet.poi = poi;
         this.sheet.drag = 0;
         this.sheet.context = (opts && opts.context) || 'map';
+        // Class drives the notes-peek visibility (CSS hides it by default,
+        // shows it only when .in-app.is-poi-saved is on). Keeps the DOM
+        // stable across save/unsave taps - no sheet re-render needed.
+        this.app.classList.toggle('is-poi-saved', this.isPoiSaved(poi));
         this.renderSheet();
         this.app.classList.add('is-sheet-open');
         // Lock the document scroll so iOS Safari + Chrome Android don't fire
@@ -836,6 +840,8 @@
             delete saved[id];
             this.writeSaved(saved);
             if (btn) { btn.classList.remove('is-saved'); btn.textContent = 'Save'; }
+            // Hide the notes peek the moment the POI is unsaved.
+            this.app.classList.remove('is-poi-saved');
             this.showToast('Removed from saved');
             this.state.events.emit('sheet:save', { poi: poi, saved: false });
         } else {
@@ -860,6 +866,8 @@
             };
             this.writeSaved(saved);
             if (btn) { btn.classList.add('is-saved'); btn.textContent = 'Saved ✓'; }
+            // Reveal the notes peek now that the POI is kept.
+            this.app.classList.add('is-poi-saved');
             this.showToast('Saved!');
             this.state.events.emit('sheet:save', { poi: poi, saved: true });
         }

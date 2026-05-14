@@ -1,4 +1,16 @@
 # Changelog
+## 0.5.4 - 2026-05-14
+
+- **Personal-note peek strip is now save-gated.** Unsaved POIs no
+  longer show the "Add a personal note" peek at the bottom of the
+  sheet - it was visually noisy for casual browsing. The strip only
+  appears after the user taps Save (and disappears immediately on
+  Unsave). Implemented via a `.is-poi-saved` class on `.in-app` that
+  the JS toggles on every `openSheet` + `toggleSavedPoi` call; CSS
+  hides the peek by default and reveals it only when the class is
+  on. No sheet re-render needed when the user toggles save - the
+  peek slides in/out from class change alone.
+
 ## 0.5.3 - 2026-05-14
 
 Notes panel rewrite. Three reported bugs in one fix:

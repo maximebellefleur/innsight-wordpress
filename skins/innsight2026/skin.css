@@ -1125,8 +1125,14 @@ body.innsight-sheet-locked {
 /* ── v0.5.0 - Personal note pull-up ──────────────────────────────────────── */
 
 /* Peek strip at the bottom of the sheet. Shows the downward arrow + label
- * + a thin top edge of the textarea, hinting "drag me up to write a note". */
+ * + a thin top edge of the textarea, hinting "drag me up to write a note".
+ *
+ * Hidden by default; revealed only when the POI is saved (the JS toggles
+ * `.is-poi-saved` on `.in-app` after every openSheet / save / unsave).
+ * This keeps the sheet visually quiet for unsaved POIs - notes are a
+ * "keeper's feature", not noise for casual browsing. */
 .in-sheet__notes-peek {
+    display: none;
     margin-top: 22px;
     padding: 14px 16px 0;
     background: var(--in-bg);
@@ -1142,6 +1148,7 @@ body.innsight-sheet-locked {
      * sheet's vertical-scroll. */
     touch-action: none;
 }
+.in-app.is-poi-saved .in-sheet__notes-peek { display: block; }
 .in-sheet__notes-peek:hover { background: #fff; color: var(--in-ink); }
 .in-sheet__notes-peek-arrow {
     display: block;
