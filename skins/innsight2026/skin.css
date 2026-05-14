@@ -34,11 +34,18 @@
 }
 
 /* ── Reset / app frame ───────────────────────────────────────────────────── */
+/* .in-app fills 100% of the shortcode container (.innsight-map-target,
+ * which gets its height from the shortcode's `height` attribute - 70vh
+ * default). We deliberately do NOT set min-height: 100dvh here - that
+ * forces the app taller than its container on pages with sidebars /
+ * shorter shortcode heights, which causes the tab bar to escape and
+ * the layout to overflow into surrounding theme content. Authors who
+ * want a full-viewport map should pass height="100dvh" in the shortcode. */
 .in-app {
     position: relative;
     width: 100%;
     height: 100%;
-    min-height: 100dvh;
+    min-height: 360px;
     background: var(--in-bg);
     overflow: hidden;
     font-family: var(--in-font-ui);
@@ -273,6 +280,13 @@
 .in-chips--small .in-chip__dot { width: 7px; height: 7px; }
 
 /* ── Tab bar ─────────────────────────────────────────────────────────────── */
+/* position: absolute keeps the tab bar at the bottom edge of .in-app.
+ * On pages where .in-app fills the viewport, that's the bottom of the
+ * screen; on pages where the shortcode is shorter than the viewport, the
+ * tab bar lives at the bottom of the visible shortcode footprint and
+ * scrolls with it - this is the correct "embedded UI" behaviour. Authors
+ * who want an always-on tab bar should pass height="100dvh" in the
+ * shortcode so the .in-app covers the full viewport. */
 .in-tabs {
     position: absolute;
     left: 12px; right: 12px;
@@ -280,7 +294,7 @@
     z-index: 70;
     height: 58px;
     border-radius: 999px;
-    background: var(--in-bg);
+    background: var(--in-bg) !important;
     border: 1.5px solid var(--in-ink);
     box-shadow: 3px 3px 0 var(--in-ink);
     display: flex; align-items: center;
@@ -300,8 +314,8 @@
     display: inline-flex; align-items: center; justify-content: center;
 }
 .in-tab[aria-selected="true"] {
-    background: var(--in-ink);
-    color: var(--in-bg);
+    background: var(--in-ink) !important;
+    color: #ffffff !important;
 }
 .in-tab__underline {
     position: absolute;
@@ -589,13 +603,25 @@
 .in-sheet__act--primary,
 .in-sheet__act--primary:visited,
 .in-sheet__act--primary:hover,
-.in-sheet__act--primary:focus {
+.in-sheet__act--primary:focus,
+.in-sheet__act--primary:active {
     /* Pure white text - cream (--in-bg) on ink reads too dim. Both
-     * the <button> and <a> form get the same color. */
-    background: var(--in-ink);
-    color: #ffffff;
-    border-color: var(--in-ink);
+     * the <button> and <a> form get the same color. `!important`
+     * everywhere because host themes routinely override `a, button`
+     * colors and we end up with invisible text on a black pill. */
+    background: var(--in-ink) !important;
+    color: #ffffff !important;
+    border-color: var(--in-ink) !important;
+    text-decoration: none !important;
 }
+.in-sheet__act--primary span { color: inherit !important; }
+.in-sheet__act,
+.in-sheet__act:visited,
+.in-sheet__act:hover,
+.in-sheet__act:focus {
+    color: var(--in-ink) !important;
+}
+.in-sheet__act--primary { color: #ffffff !important; }
 
 /* ── List view ───────────────────────────────────────────────────────────── */
 .in-list {
@@ -892,8 +918,8 @@
     bottom: 100px;
     left: 50%;
     transform: translateX(-50%) translateY(20px);
-    background: var(--in-ink);
-    color: #fff;
+    background: var(--in-ink) !important;
+    color: #ffffff !important;
     padding: 10px 18px;
     border-radius: 999px;
     font-size: 13px;
@@ -1242,12 +1268,15 @@ body.innsight-sheet-locked {
     flex: 1;
     line-height: 1;
 }
-.in-notes__close {
+.in-notes__close,
+.in-notes__close:visited,
+.in-notes__close:hover,
+.in-notes__close:focus {
     height: 36px;
     padding: 0 16px;
     border-radius: 999px;
-    background: var(--in-ink);
-    color: #fff;
+    background: var(--in-ink) !important;
+    color: #ffffff !important;
     border: 0;
     font: inherit; font-weight: 600;
     cursor: pointer;
@@ -1282,14 +1311,18 @@ body.innsight-sheet-locked {
 .in-notes__area:focus { box-shadow: 2px 2px 0 var(--in-accent), 2px 2px 0 1.5px var(--in-ink); }
 
 /* ── v0.5.0 - Share button (Saved tab header) ────────────────────────────── */
-.in-saved__share {
+.in-saved__share,
+.in-saved__share:visited,
+.in-saved__share:hover,
+.in-saved__share:focus,
+.in-saved__share:active {
     display: inline-flex; align-items: center; gap: 6px;
     height: 38px;
     padding: 0 14px;
     border-radius: 999px;
-    background: var(--in-ink);
-    color: var(--in-bg);
-    border: 1.5px solid var(--in-ink);
+    background: var(--in-ink) !important;
+    color: #ffffff !important;
+    border: 1.5px solid var(--in-ink) !important;
     box-shadow: 2px 2px 0 var(--in-accent);
     font: inherit;
     font-weight: 700;
@@ -1297,6 +1330,8 @@ body.innsight-sheet-locked {
     cursor: pointer;
     transition: transform 120ms, box-shadow 120ms;
 }
+.in-saved__share span { color: inherit !important; }
+.in-saved__share svg  { color: inherit !important; }
 .in-saved__share:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--in-accent); }
 .in-saved__share[hidden] { display: none; }
 
@@ -1474,12 +1509,25 @@ body.innsight-sheet-locked {
     cursor: pointer;
     transition: transform 120ms, box-shadow 120ms;
 }
-.in-receive__btn--primary {
-    background: var(--in-ink);
-    color: #fff;
+.in-receive__btn--primary,
+.in-receive__btn--primary:visited,
+.in-receive__btn--primary:hover,
+.in-receive__btn--primary:focus,
+.in-receive__btn--primary:active {
+    background: var(--in-ink) !important;
+    color: #ffffff !important;
+    border-color: var(--in-ink) !important;
     box-shadow: 2px 2px 0 var(--in-accent);
 }
 .in-receive__btn--primary:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--in-accent); }
+.in-receive__btn,
+.in-receive__btn:visited,
+.in-receive__btn:hover,
+.in-receive__btn:focus {
+    color: var(--in-ink) !important;
+    border-color: var(--in-ink) !important;
+}
+.in-receive__btn--primary { color: #ffffff !important; }
 
 /* ── v0.5.0 - Dancing 'Friend's picks' chip ─────────────────────────────── */
 .in-chip--shared {

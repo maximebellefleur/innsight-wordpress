@@ -1,4 +1,50 @@
 # Changelog
+## 0.5.5 - 2026-05-14
+
+Theme-hardening + layout fix.
+
+### Button text was invisible on dark buttons
+
+Host themes routinely override `a, button { color }` site-wide, which
+defeated our white-on-black design (Share button, Save Them All, sheet
+primary action, notes Done, toast, active tab). Every dark-background
+button now declares `background` + `color` + `border-color` with
+`!important`, plus child `span` / `svg` inherit color explicitly.
+Bulletproof against the most aggressive theme overrides.
+
+Affected:
+- `.in-saved__share` (Saved tab Share button)
+- `.in-receive__btn--primary` ("Save them all" in the receive popup)
+- `.in-receive__btn` (general receive popup buttons)
+- `.in-sheet__act--primary` (sheet's primary action - "Book now",
+  "More info", etc.)
+- `.in-sheet__act` (sheet's secondary "Save" button)
+- `.in-tab[aria-selected="true"]` (active tab pill)
+- `.in-notes__close` (notes Done button)
+- `.in-toast` (save/unsave toast)
+
+### `.in-app` no longer forces 100dvh
+
+`min-height: 100dvh` on `.in-app` was making the shortcode taller than
+its container on pages where authors set `height="70vh"` (the default)
+or where the theme template constrains the embed. The result: the tab
+bar escaped the shortcode footprint and overflowed into surrounding
+theme content (visible in the "different experience you might like"
+text bleed-through). `.in-app` now uses `height: 100%` (= parent's
+`height` attribute) with a `min-height: 360px` safety floor. Authors
+who want a full-viewport map should pass `height="100dvh"` in the
+shortcode.
+
+### Tab bar visibility behaviour, documented
+
+The tab bar lives inside `.in-app` and scrolls with it - this is
+correct "embedded shortcode UI" behaviour. On pages where the
+shortcode is shorter than the viewport, the tab bar is at the bottom
+of the visible shortcode footprint and disappears when the user
+scrolls past the shortcode. To keep the tab bar always visible, set
+`height="100dvh"` in the shortcode so the map covers the full
+viewport.
+
 ## 0.5.4 - 2026-05-14
 
 - **Personal-note peek strip is now save-gated.** Unsaved POIs no
