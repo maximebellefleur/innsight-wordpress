@@ -776,6 +776,17 @@
         return true;
     };
     SkinController.prototype.closeSheet = function () {
+        // End any in-progress swipe gesture cleanly so a half-finished
+        // drag can't leave the inner card stuck mid-transform when it
+        // re-opens for the next POI.
+        if (this._cancelSwipe) this._cancelSwipe();
+        var inner = this.target.querySelector('[data-innsight-sheet-inner]');
+        if (inner) {
+            inner.style.transform = '';
+            inner.style.opacity = '';
+            inner.style.transition = '';
+        }
+
         // Collapse the notes pull-up first so it doesn't linger behind the
         // sheet while the sheet animates away.
         this.app.classList.remove('is-notes-open');
@@ -795,6 +806,16 @@
         if (!poi) return;
         var inner = this.target.querySelector('[data-innsight-sheet-inner]');
         if (!inner) return;
+        // Force-cancel any in-progress swipe gesture before swapping
+        // content. Without this, an interrupted swipe (e.g. a fast-double
+        // swipe, or a render triggered by enrichment landing) could leave
+        // the inner card stuck with an inline transform/opacity from the
+        // half-finished gesture. _cancelSwipe is set once by bindSheetSwipe.
+        if (this._cancelSwipe) this._cancelSwipe();
+        // Defensive belt-and-braces in case bindSheetSwipe hasn't run yet.
+        inner.style.transform = '';
+        inner.style.opacity = '';
+        inner.style.transition = '';
         var ctx = this.buildSheetContext(poi);
         inner.innerHTML = Innsight._template.render(this.state.partials.sheet || '', ctx);
         // Wire sheet controls.
@@ -1075,92 +1096,111 @@
 
     /**
      * Three coexisting gestures on the sheet:
-     *   - Horizontal swipe (anywhere) -> prev/next POI in category
+     *   - Horizontal swipe (anywhere) -> prev/next POI in context list
      *   - Vertical drag DOWN from the top zone (grabber + nav row) -> close
      *   - Native scroll (vertical, below the top zone) -> scrolls sheet content
-     * The mode is decided on the first move past an 8px threshold and stays
+     * Mode is decided on the first move past an 8px threshold and stays
      * locked for the rest of that gesture. Buttons / links cancel the
      * gesture entirely so taps still fire.
+     *
+     * BIND-ONCE: the `inner` DOM node is a fixed element in layout.html
+     * and survives every renderSheet. We bind handlers exactly once per
+     * controller lifetime and store gesture state on `this._swipe`. Re-
+     * binding on every render (the previous behaviour) stacked listeners
+     * and caused one swipe to fire `navigateSheet` 2-N times, leaving
+     * the card stuck mid-transform with no way back.
      */
     SkinController.prototype.bindSheetSwipe = function (inner) {
+        if (this._swipeBound) return;
+        this._swipeBound = true;
+
         var self = this;
-        var startX = 0, startY = 0, dx = 0, dy = 0, mode = null, active = false, topZone = false;
         var TOP_ZONE_PX = 90;
         var HORIZ_THRESHOLD = 70;
         var VERT_CLOSE_THRESHOLD = 110;
 
+        // Single piece of mutable state, keyed off the controller so a
+        // re-render can't accidentally restart it mid-gesture.
+        var st = self._swipe = { active: false, startX: 0, startY: 0, dx: 0, dy: 0, mode: null, topZone: false, pointerId: null };
+
+        function resetVisuals() {
+            inner.style.transition = '';
+            inner.style.transform = '';
+            inner.style.opacity = '';
+        }
+        function endGesture() {
+            // Always clears state AND visuals, regardless of how the
+            // gesture ended. Idempotent - safe to call from anywhere.
+            if (st.pointerId != null) {
+                try { inner.releasePointerCapture(st.pointerId); } catch (er) {}
+            }
+            st.active = false;
+            st.mode = null;
+            st.pointerId = null;
+            resetVisuals();
+        }
+        // Expose so renderSheet/closeSheet can force-cancel any half-
+        // finished gesture before swapping content.
+        self._cancelSwipe = endGesture;
+
         function onDown(e) {
             if (e.target.closest('button, a, input, select, textarea')) return;
-            startX = e.clientX; startY = e.clientY;
-            dx = 0; dy = 0;
-            mode = null;
-            active = true;
-            // "Top zone" = first ~90px of the sheet (grabber + nav row).
-            // Only vertical drags STARTING here close the sheet; below this,
-            // vertical scroll is native (the content area can scroll).
+            // If a previous gesture didn't get a clean up event (rare on
+            // mobile when the system steals the pointer), end it first.
+            if (st.active) endGesture();
+            st.startX = e.clientX; st.startY = e.clientY;
+            st.dx = 0; st.dy = 0;
+            st.mode = null;
+            st.active = true;
+            st.pointerId = e.pointerId;
             var rect = inner.getBoundingClientRect();
-            topZone = (e.clientY - rect.top) < TOP_ZONE_PX;
+            st.topZone = (e.clientY - rect.top) < TOP_ZONE_PX;
             inner.classList.remove('is-hint');
-            // Remove any in-progress snap-back transition so the drag tracks
-            // the finger instantly.
             inner.style.transition = 'none';
             try { inner.setPointerCapture(e.pointerId); } catch (er) {}
         }
         function onMove(e) {
-            if (!active) return;
-            dx = e.clientX - startX;
-            dy = e.clientY - startY;
-            if (mode === null) {
-                if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-                if (Math.abs(dx) > Math.abs(dy)) mode = 'h';
-                else if (dy > 0 && topZone) mode = 'v';
-                else mode = 'native';
+            if (!st.active) return;
+            st.dx = e.clientX - st.startX;
+            st.dy = e.clientY - st.startY;
+            if (st.mode === null) {
+                if (Math.abs(st.dx) < 8 && Math.abs(st.dy) < 8) return;
+                if (Math.abs(st.dx) > Math.abs(st.dy)) st.mode = 'h';
+                else if (st.dy > 0 && st.topZone) st.mode = 'v';
+                else st.mode = 'native';
             }
-            if (mode === 'h') {
+            if (st.mode === 'h') {
                 if (e.cancelable) e.preventDefault();
-                inner.style.transform = 'translateX(' + dx + 'px)';
-                inner.style.opacity = Math.max(0.4, 1 - Math.abs(dx) / 320);
-            } else if (mode === 'v') {
+                inner.style.transform = 'translateX(' + st.dx + 'px)';
+                inner.style.opacity = Math.max(0.4, 1 - Math.abs(st.dx) / 320);
+            } else if (st.mode === 'v') {
                 if (e.cancelable) e.preventDefault();
-                var down = Math.max(0, dy);
+                var down = Math.max(0, st.dy);
                 inner.style.transform = 'translateY(' + down + 'px)';
                 inner.style.opacity = Math.max(0.5, 1 - down / 600);
             }
             // 'native' -> let the browser scroll the inner naturally.
         }
-        function onUp(e) {
-            if (!active) return;
-            active = false;
-            try { inner.releasePointerCapture(e.pointerId); } catch (er) {}
-            // Restore the sheet's standard return transition.
-            inner.style.transition = '';
+        function onUp() {
+            if (!st.active) return;
+            // Snapshot the gesture outcome BEFORE we reset state - calling
+            // navigateSheet/closeSheet may trigger a re-render that runs
+            // resetVisuals again, which would race the snapshot.
+            var mode = st.mode, dx = st.dx, dy = st.dy;
+            endGesture();
             if (mode === 'h') {
-                inner.style.transform = '';
-                inner.style.opacity = '';
                 if (dx < -HORIZ_THRESHOLD) self.navigateSheet(+1);
                 else if (dx > HORIZ_THRESHOLD) self.navigateSheet(-1);
             } else if (mode === 'v') {
-                if (dy > VERT_CLOSE_THRESHOLD) {
-                    // Past the threshold: animate the rest of the way down
-                    // and close. Use closeSheet's own slide-out for the
-                    // backdrop fade.
-                    self.closeSheet();
-                    // closeSheet animates the whole .in-sheet wrapper; clear
-                    // the local inline transform so the wrapper's transition
-                    // is what the user sees.
-                    inner.style.transform = '';
-                    inner.style.opacity = '';
-                } else {
-                    inner.style.transform = '';
-                    inner.style.opacity = '';
-                }
+                if (dy > VERT_CLOSE_THRESHOLD) self.closeSheet();
             }
-            mode = null;
         }
+
         inner.addEventListener('pointerdown', onDown);
         inner.addEventListener('pointermove', onMove);
         inner.addEventListener('pointerup', onUp);
         inner.addEventListener('pointercancel', onUp);
+        inner.addEventListener('lostpointercapture', onUp);
     };
 
     SkinController.prototype.maybePlayHint = function () {

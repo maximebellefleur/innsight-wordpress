@@ -1,4 +1,39 @@
 # Changelog
+## 0.5.10 - 2026-05-14
+
+Sheet swipe stuck-card fix.
+
+### Root cause
+
+`bindSheetSwipe(inner)` was called on every `renderSheet` (which fires
+on every POI navigation, every enrichment-applied refresh, every
+filter change while a sheet is open). The `inner` DOM node is the
+same fixed element across renders, so each call STACKED another set
+of pointer listeners. After 5 renders, one swipe fired
+`navigateSheet(±1)` 5 times in rapid succession; the visual
+`translateX` from the last swipe got overwritten by render-races and
+the card ended up stuck mid-screen with no way back.
+
+### Fix
+
+- **Bind once per controller lifetime.** `bindSheetSwipe` early-
+  returns on its second call. Gesture state lives on
+  `this._swipe` instead of in per-call closures.
+- **Always reset visuals.** `endGesture()` clears `transform`,
+  `opacity`, and `transition` on every gesture end - regardless of
+  mode (horizontal / vertical / native), regardless of how it ended
+  (pointerup / pointercancel / lostpointercapture). New
+  `lostpointercapture` listener catches the cases where the OS or
+  browser steals the pointer mid-drag.
+- **Force-cancel mid-render.** `renderSheet` and `closeSheet` now
+  call `_cancelSwipe()` before swapping content, so a fast double-
+  swipe or a render triggered by enrichment landing during a drag
+  can't leave the inner card stuck with leftover inline styles.
+- **Snapshot before navigate.** `onUp` snapshots `mode/dx/dy` BEFORE
+  calling `navigateSheet/closeSheet` (which triggers the cascading
+  re-render). Without the snapshot, the re-render's `_cancelSwipe`
+  would clear state before we read it, making the swipe a no-op.
+
 ## 0.5.9 - 2026-05-14
 
 WhatsApp Desktop URL fix.
