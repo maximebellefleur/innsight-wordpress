@@ -1320,9 +1320,13 @@ body.innsight-sheet-locked {
     color: var(--in-ink);
     text-decoration: none;
 }
+/* Icons throughout the strip: outline-only, muted grey, no fills.
+ * Subtle enough to read as glyphs without competing with the text. */
 .in-sheet__gicon {
-    color: var(--in-mute3);
+    color: rgba(15, 15, 15, 0.35) !important;
+    fill: none !important;
     flex-shrink: 0;
+    stroke-width: 1.2;
 }
 .in-sheet__gsep { color: var(--in-mute2); }
 
@@ -1344,7 +1348,6 @@ body.innsight-sheet-locked {
     transition: background 120ms;
 }
 .in-sheet__gitem--rating:hover { background: rgba(15,15,15,0.05) !important; transform: none !important; }
-.in-sheet__gitem--rating .in-sheet__gicon { color: #E6A700; }
 .in-sheet__gitem--rating[aria-expanded="true"] { background: rgba(15,15,15,0.08) !important; }
 
 .in-sheet__gitem--hours {
@@ -1436,7 +1439,11 @@ body.innsight-sheet-locked {
     align-items: center;
     gap: 2px;
 }
-.in-sheet__greview-rating svg { color: #E6A700; }
+.in-sheet__greview-rating svg {
+    color: rgba(15, 15, 15, 0.35);
+    fill: none;
+    stroke-width: 1.2;
+}
 .in-sheet__greview-when { color: var(--in-mute2); font-size: 11px; margin-left: auto; }
 .in-sheet__greview-text {
     margin: 0;

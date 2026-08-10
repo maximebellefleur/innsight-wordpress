@@ -1,4 +1,13 @@
 # Changelog
+## 0.7.7 - 2026-05-14
+
+- **All Google-strip icons are outline-only, muted grey now** (no
+  amber star, no filled shapes). `.in-sheet__gicon` forces
+  `fill: none !important; color: rgba(15,15,15,0.35) !important;
+  stroke-width: 1.2` on every icon in the strip and the reviews
+  panel. Star icon rewritten as an outline path. The 0.7.6 chunky
+  amber-star look is gone.
+
 ## 0.7.6 - 2026-05-14
 
 Google info strip redesign + backend additions.
