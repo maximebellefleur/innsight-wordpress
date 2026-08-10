@@ -918,9 +918,12 @@ final class Places {
             'id', 'displayName',
             'rating', 'userRatingCount',
             'currentOpeningHours', 'regularOpeningHours',
+            'utcOffsetMinutes',
+            'formattedAddress', 'shortFormattedAddress',
+            'priceLevel', 'priceRange',
             'photos',
             'googleMapsUri', 'websiteUri',
-            'nationalPhoneNumber',
+            'nationalPhoneNumber', 'internationalPhoneNumber',
             'reviews',
         ) );
         $res = wp_remote_get( $url, array(
@@ -938,19 +941,50 @@ final class Places {
 
     /**
      * Reshape the Places response into the flat shape our skin templates
-     * expect. Same keys as the pre-0.7 client-side google-places.js so the
-     * skin needs no rewrites.
+     * expect. The openNow flag is recomputed on each build from the
+     * `periods` array against the venue's utcOffsetMinutes + current
+     * UTC time so it's ALWAYS correct - Google's own openNow can be
+     * stale if the cached row was fetched hours ago, and it doesn't
+     * respect the site's timezone.
      */
     private function shape( array $details, string $api_key, array $poi_data ): array {
         $open    = $details['currentOpeningHours'] ?? $details['regularOpeningHours'] ?? null;
         $weekday = ( $open && isset( $open['weekdayDescriptions'] ) ) ? $open['weekdayDescriptions'] : array();
-        $today_idx = (int) current_time( 'w' );  // 0 = Sun, matches Places order in most locales
+        $periods = ( $open && isset( $open['periods'] ) ) ? $open['periods'] : array();
+        $utc_off = isset( $details['utcOffsetMinutes'] ) ? (int) $details['utcOffsetMinutes'] : null;
+
+        $today_idx = (int) current_time( 'w' );  // 0 = Sun
         $todays = isset( $weekday[ $today_idx ] ) ? (string) $weekday[ $today_idx ] : '';
-        // weekdayDescriptions come like "Monday: 6:00 AM – 6:30 PM"; strip
-        // the day-of-week prefix so we can show a clean "6:00 AM – 6:30 PM".
         if ( $todays && strpos( $todays, ':' ) !== false ) {
             $parts = explode( ':', $todays, 2 );
             $todays = trim( $parts[1] );
+        }
+
+        // Timezone-correct openNow. Convert current UTC to venue local
+        // time via utcOffsetMinutes, then check today's periods.
+        $open_now = null;
+        if ( $utc_off !== null && ! empty( $periods ) ) {
+            $now_utc  = time();
+            $venue_ts = $now_utc + ( $utc_off * 60 );
+            $vdow     = (int) gmdate( 'w', $venue_ts );        // 0 = Sun
+            $vmin     = (int) gmdate( 'G', $venue_ts ) * 60 + (int) gmdate( 'i', $venue_ts );
+            $open_now = false;
+            foreach ( $periods as $p ) {
+                $od = isset( $p['open']['day'] ) ? (int) $p['open']['day'] : null;
+                if ( $od === null || $od !== $vdow ) continue;
+                $om = ( (int) ( $p['open']['hour'] ?? 0 ) ) * 60 + (int) ( $p['open']['minute'] ?? 0 );
+                if ( empty( $p['close'] ) ) {
+                    // 24-hour open on this day.
+                    if ( $vmin >= $om ) { $open_now = true; break; }
+                    continue;
+                }
+                $cm = ( (int) ( $p['close']['hour'] ?? 0 ) ) * 60 + (int) ( $p['close']['minute'] ?? 0 );
+                if ( (int) ( $p['close']['day'] ?? $od ) !== $od ) $cm += 24 * 60;
+                if ( $vmin >= $om && $vmin < $cm ) { $open_now = true; break; }
+            }
+        } elseif ( $open ) {
+            // Fallback to Google's own flag when no periods present.
+            $open_now = (bool) ( $open['openNow'] ?? false );
         }
 
         $photo_url = '';
@@ -959,10 +993,6 @@ final class Places {
                 . '/media?maxHeightPx=720&key=' . rawurlencode( $api_key );
         }
 
-        // Directions URL: uses lat/lon from the POI (not from Google) so
-        // even if Places drift the coordinate slightly, the direction
-        // matches what's on the map. Fallback to placeId when we have it
-        // (survives lat/lon inaccuracy in the POI).
         $lat = (float) ( $poi_data['lat'] ?? 0 );
         $lon = (float) ( $poi_data['lon'] ?? 0 );
         $directions_uri = ( $lat && $lon )
@@ -972,18 +1002,52 @@ final class Places {
             $directions_uri .= '&destination_place_id=' . rawurlencode( $details['id'] );
         }
 
+        // Price - the New API returns EITHER `priceLevel` (enum
+        // PRICE_LEVEL_INEXPENSIVE|MODERATE|EXPENSIVE|VERY_EXPENSIVE) or
+        // `priceRange` (localized text like "€10-20"). Render whichever
+        // we get; skin decides which to prefer.
+        $price_level_map = array(
+            'PRICE_LEVEL_FREE'           => '',
+            'PRICE_LEVEL_INEXPENSIVE'    => '$',
+            'PRICE_LEVEL_MODERATE'       => '$$',
+            'PRICE_LEVEL_EXPENSIVE'      => '$$$',
+            'PRICE_LEVEL_VERY_EXPENSIVE' => '$$$$',
+        );
+        $price_symbol = '';
+        if ( ! empty( $details['priceLevel'] ) && isset( $price_level_map[ $details['priceLevel'] ] ) ) {
+            $price_symbol = $price_level_map[ $details['priceLevel'] ];
+        }
+        $price_text = '';
+        if ( ! empty( $details['priceRange'] ) ) {
+            $s = isset( $details['priceRange']['startPrice']['units'] ) ? (int) $details['priceRange']['startPrice']['units'] : null;
+            $e = isset( $details['priceRange']['endPrice']['units'] ) ? (int) $details['priceRange']['endPrice']['units'] : null;
+            $cur = (string) ( $details['priceRange']['startPrice']['currencyCode'] ?? $details['priceRange']['endPrice']['currencyCode'] ?? '' );
+            if ( $s !== null && $e !== null ) $price_text = trim( $cur . ' ' . $s . '-' . $e );
+            elseif ( $s !== null ) $price_text = trim( $cur . ' ' . $s . '+' );
+        }
+
+        $phone = (string) ( $details['nationalPhoneNumber'] ?? $details['internationalPhoneNumber'] ?? '' );
+        $phone_uri = $phone !== '' ? 'tel:' . preg_replace( '/[^\d+]/', '', (string) ( $details['internationalPhoneNumber'] ?? $phone ) ) : '';
+
+        $address = (string) ( $details['shortFormattedAddress'] ?? $details['formattedAddress'] ?? '' );
+
         return array(
             'placeId'         => (string) ( $details['id'] ?? '' ),
             'rating'          => isset( $details['rating'] ) ? (float) $details['rating'] : null,
             'userRatingCount' => isset( $details['userRatingCount'] ) ? (int) $details['userRatingCount'] : null,
-            'openNow'         => $open ? (bool) ( $open['openNow'] ?? false ) : null,
+            'openNow'         => $open_now,
             'todaysHours'     => $todays,
             'weekdayHours'    => array_values( $weekday ),
+            'utcOffsetMinutes' => $utc_off,
+            'address'         => $address,
+            'priceSymbol'     => $price_symbol,
+            'priceText'       => $price_text,
             'googleMapsUri'   => (string) ( $details['googleMapsUri'] ?? '' ),
             'reviewsUri'      => ! empty( $details['googleMapsUri'] ) ? $details['googleMapsUri'] . '&hl=en' : '',
             'directionsUri'   => $directions_uri,
             'websiteUri'      => (string) ( $details['websiteUri'] ?? '' ),
-            'phone'           => (string) ( $details['nationalPhoneNumber'] ?? '' ),
+            'phone'           => $phone,
+            'phoneUri'        => $phone_uri,
             'photoUrl'        => $photo_url,
             'reviews'         => array_map( static function ( $r ) {
                 return array(

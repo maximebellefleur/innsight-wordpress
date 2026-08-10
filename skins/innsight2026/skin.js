@@ -810,6 +810,12 @@
             if (data.googleMapsUri)           poi.googleMapsUri = data.googleMapsUri;
             if (data.reviewsUri)              poi.reviewsUri = data.reviewsUri;
             if (data.directionsUri)           poi.directionsUri = data.directionsUri;
+            if (data.address)                 poi.address = data.address;
+            if (data.priceSymbol)             poi.priceSymbol = data.priceSymbol;
+            if (data.priceText)               poi.priceText = data.priceText;
+            if (data.phone)                   poi.phone = data.phone;
+            if (data.phoneUri)                poi.phoneUri = data.phoneUri;
+            if (data.reviews)                 poi.reviews = data.reviews;
             if (data.websiteUri && poi.button && !poi.button.url) {
                 poi.button.url = data.websiteUri;
                 if (!poi.button.text) poi.button.text = 'Website';
@@ -927,6 +933,18 @@
                 var open = !schedList.hasAttribute('hidden');
                 if (open) { schedList.setAttribute('hidden', ''); schedToggle.setAttribute('aria-expanded', 'false'); schedToggle.textContent = 'see all'; }
                 else      { schedList.removeAttribute('hidden'); schedToggle.setAttribute('aria-expanded', 'true'); schedToggle.textContent = 'hide'; }
+            });
+        }
+        // Tap on the rating chip expands the top-3 reviews inline. Same
+        // hidden-attribute toggle pattern as the schedule dropdown; the
+        // aria-expanded on the chip stays in sync.
+        var reviewsToggle = inner.querySelector('[data-innsight-reviews-toggle]');
+        var reviewsPanel  = inner.querySelector('[data-innsight-reviews]');
+        if (reviewsToggle && reviewsPanel) {
+            reviewsToggle.addEventListener('click', function () {
+                var open = !reviewsPanel.hasAttribute('hidden');
+                if (open) { reviewsPanel.setAttribute('hidden', ''); reviewsToggle.setAttribute('aria-expanded', 'false'); }
+                else      { reviewsPanel.removeAttribute('hidden'); reviewsToggle.setAttribute('aria-expanded', 'true'); }
             });
         }
         // "More info" toggles a Featured-in popover above the actions.
@@ -1161,6 +1179,30 @@
         ctx.hasGoogleStrip = !!(ctx.rating || ctx.hours || ctx.directionsUri || ctx.enrichExpected);
         // Kept for backward compat with the previous CSS-driven pulse.
         ctx.enrichPending = ctx.enrichLoading;
+        // Price, phone, address rows (each rendered only when present).
+        ctx.priceSymbol = poi.priceSymbol || '';
+        ctx.priceText   = poi.priceText   || '';
+        ctx.priceLabel  = ctx.priceSymbol + (ctx.priceText ? (ctx.priceSymbol ? ' · ' : '') + ctx.priceText : '');
+        ctx.hasPrice    = !!(ctx.priceSymbol || ctx.priceText);
+        ctx.phone       = poi.phone || '';
+        ctx.phoneUri    = poi.phoneUri || '';
+        ctx.address     = poi.address || '';
+        // Reviews (top 3 for inline expansion). Empty array shows a
+        // "no reviews yet" state; missing = enrichment not landed.
+        ctx.reviews = Array.isArray(poi.reviews)
+            ? poi.reviews.slice(0, 3).map(function (r) {
+                var txt = String(r.text || '').replace(/\s+/g, ' ').trim();
+                return {
+                    author: r.author || '',
+                    ratingStars: r.rating != null ? Math.round(r.rating) : 0,
+                    ratingLabel: r.rating != null ? Number(r.rating).toFixed(1) : '',
+                    text: txt.length > 240 ? txt.slice(0, 237) + '…' : txt,
+                    when: r.when || '',
+                    uri: r.uri || ''
+                };
+            })
+            : [];
+        ctx.hasReviews = ctx.reviews.length > 0;
         // Stash for navigation.
         this.sheet.siblings = siblings;
         this.sheet.idx = idx;

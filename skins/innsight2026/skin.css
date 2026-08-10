@@ -1290,45 +1290,63 @@ body.innsight-sheet-locked {
     .in-livedot__pulse { animation: none !important; opacity: 0.2; }
 }
 
-/* ── v0.7.0 - Google info strip (subtle, single line) ───────────────────── */
+/* ── v0.7.6 - Google info strip (subtle, iconic, expandable) ─────────────── */
 
-/* Sits right under the title, above blurb + actions. Compact, low-
- * visual-weight so it never fights the title / description. Rating
- * links out to Google reviews; hours show today's + a "see all"
- * toggle for the full weekday list; directions is a small link
- * underneath. When the server-side cache is empty and enrichment is
- * pending, the whole strip renders as a shimmer skeleton (below). */
+/* Sits right under the title, above blurb + actions. Low-visual-weight
+ * so it never fights the title / description. Rating is a subtle
+ * TEXT chip (no bg) - a click expands the top 3 reviews inline. Hours
+ * expand into a nicer 7-day panel. Price + phone + address stack
+ * subtly below. */
 .in-sheet__gstrip {
     margin: 8px 0 14px;
     font-size: 13px;
     color: var(--in-mute3);
-    line-height: 1.35;
+    line-height: 1.4;
 }
 .in-sheet__gstrip-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 12px;
+    gap: 4px 12px;
+}
+.in-sheet__gsecondary {
+    margin-top: 4px;
+    font-size: 12.5px;
 }
 .in-sheet__gitem {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     color: var(--in-ink);
     text-decoration: none;
 }
+.in-sheet__gicon {
+    color: var(--in-mute3);
+    flex-shrink: 0;
+}
+.in-sheet__gsep { color: var(--in-mute2); }
+
+/* Rating: subtle text chip. No bg, no border. Star tints amber to
+ * make it visually distinct from the surrounding grey text without
+ * screaming. Clickable - toggles reviews panel below. */
 .in-sheet__gitem--rating {
-    font-weight: 600;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 2px 4px !important;
+    font: inherit !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
     color: var(--in-ink) !important;
     text-decoration: none !important;
-    background: var(--in-accent);
-    border: 1px solid var(--in-ink);
-    border-radius: 999px;
-    padding: 2px 9px;
-    font-size: 12px;
-    transition: transform 120ms;
+    cursor: pointer;
+    box-shadow: none !important;
+    border-radius: 6px !important;
+    transition: background 120ms;
 }
-.in-sheet__gitem--rating:hover { transform: translate(1px, 1px); }
+.in-sheet__gitem--rating:hover { background: rgba(15,15,15,0.05) !important; transform: none !important; }
+.in-sheet__gitem--rating .in-sheet__gicon { color: #E6A700; }
+.in-sheet__gitem--rating[aria-expanded="true"] { background: rgba(15,15,15,0.08) !important; }
+
 .in-sheet__gitem--hours {
     font-size: 12.5px;
     color: var(--in-mute3);
@@ -1347,35 +1365,141 @@ body.innsight-sheet-locked {
     text-underline-offset: 2px;
     cursor: pointer;
 }
+
+/* Weekday schedule expansion. Sectioned card with an eyebrow label
+ * + tabular list; today's row is highlighted. Replaces the plain
+ * bulleted list that "looked like shit". */
 .in-sheet__gsched {
-    list-style: none;
-    margin: 6px 0 0;
-    padding: 8px 12px;
-    background: var(--in-bg);
+    margin: 8px 0 0;
+    padding: 10px 14px 12px;
+    background: #FFFDF6;
     border: 1px solid var(--in-divider);
-    border-radius: 8px;
-    font-size: 12px;
-    line-height: 1.6;
+    border-radius: 10px;
     animation: in-gsched-pop 200ms ease backwards;
 }
 .in-sheet__gsched[hidden] { display: none; }
-.in-sheet__gsched li { color: var(--in-ink); }
+.in-sheet__gsched-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--in-mute);
+    margin-bottom: 6px;
+}
+.in-sheet__gsched-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--in-ink);
+    font-variant-numeric: tabular-nums;
+}
+.in-sheet__gsched-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+    border-bottom: 1px dashed transparent;
+}
+.in-sheet__gsched-list li + li { border-top: 1px dashed rgba(15,15,15,0.08); }
 
-/* Directions link - subtle, plain-underline, doesn't compete with the
- * primary Save/More-info action row below. */
-.in-sheet__gdir {
+/* Reviews panel: shown when the rating chip is tapped. Top 3 reviews
+ * (author + rating + text truncated) + a "See all reviews on Google"
+ * link that opens the full Google Maps reviews tab. */
+.in-sheet__greviews {
+    margin: 8px 0 0;
+    padding: 10px 14px 12px;
+    background: #FFFDF6;
+    border: 1px solid var(--in-divider);
+    border-radius: 10px;
+    animation: in-gsched-pop 200ms ease backwards;
+}
+.in-sheet__greviews[hidden] { display: none; }
+.in-sheet__greview + .in-sheet__greview { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(15,15,15,0.10); }
+.in-sheet__greview-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--in-mute3);
+    margin-bottom: 3px;
+}
+.in-sheet__greview-author {
+    font-weight: 600;
+    color: var(--in-ink);
+}
+.in-sheet__greview-rating {
+    color: var(--in-ink);
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin-top: 6px;
+    gap: 2px;
+}
+.in-sheet__greview-rating svg { color: #E6A700; }
+.in-sheet__greview-when { color: var(--in-mute2); font-size: 11px; margin-left: auto; }
+.in-sheet__greview-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--in-ink);
+}
+.in-sheet__greviews-all {
+    display: inline-block;
+    margin-top: 10px;
     font-size: 12px;
     font-weight: 600;
     color: var(--in-mute3) !important;
-    text-decoration: none !important;
-    letter-spacing: 0.02em;
+    text-decoration: underline var(--in-accent) 2px !important;
+    text-underline-offset: 2px;
 }
-.in-sheet__gdir:hover { color: var(--in-ink) !important; }
-.in-sheet__gdir svg { transform: rotate(-45deg); }
+.in-sheet__greviews-all:hover { color: var(--in-ink) !important; }
+
+/* Price + phone: subtle, icon + value inline. */
+.in-sheet__gitem--price,
+.in-sheet__gitem--phone {
+    color: var(--in-ink);
+    font-size: 12.5px;
+}
+.in-sheet__gitem--phone { color: var(--in-ink) !important; text-decoration: none !important; }
+.in-sheet__gitem--phone:hover { text-decoration: underline var(--in-accent) 2px !important; text-underline-offset: 2px; }
+
+/* Address line: full address text + trailing "Directions →" CTA. The
+ * whole row is clickable - opens Google Maps directions. Replaces the
+ * old plain "Directions" link with the weird arrow icon. */
+.in-sheet__gaddress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px dashed var(--in-divider);
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--in-ink) !important;
+    text-decoration: none !important;
+    transition: background 120ms, border-color 120ms;
+}
+.in-sheet__gaddress:hover {
+    background: #FFFDF6;
+    border-color: var(--in-ink);
+}
+.in-sheet__gaddress > span:not(.in-sheet__gicon):not(.in-sheet__gaddress-cta) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.in-sheet__gaddress .in-sheet__gicon { color: var(--in-mute3); }
+.in-sheet__gaddress-cta {
+    color: var(--in-mute);
+    font-weight: 600;
+    font-size: 11.5px;
+    flex-shrink: 0;
+}
+.in-sheet__gaddress--nodetail { border-style: solid; }
 
 /* Per-item pending state. Individual gitems get --pending when the
  * server hasn't returned data for them yet. Blur + pulse just that

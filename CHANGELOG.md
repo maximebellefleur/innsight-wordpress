@@ -1,4 +1,43 @@
 # Changelog
+## 0.7.6 - 2026-05-14
+
+Google info strip redesign + backend additions.
+
+### Backend
+
+- **Price** (`priceLevel` symbol `$` / `$$` / `$$$` / `$$$$` + optional
+  localized `priceRange` text like `€10-20`) added to the Places fetch
+  + cached row.
+- **Formatted address** (prefers `shortFormattedAddress`) fetched and
+  stored alongside the POI.
+- **`utcOffsetMinutes`** fetched from Google. `openNow` is now
+  **recomputed on every build** from the venue's UTC offset + the
+  current UTC time + the `periods` array - so a cached row fetched
+  hours ago still shows the correct "Open now / Closed" state, and
+  cross-timezone POIs display accurately.
+- **`internationalPhoneNumber`** fetched so we can build a proper
+  `tel:` URI while still displaying the local-format number.
+
+### Sheet
+
+- **Rating chip is subtle now**: no accent bg, no border - just bold
+  text with an amber star. Clicking it expands the top 3 reviews
+  inline (author + rating + text truncated) with a **"See all
+  reviews on Google →"** link.
+- **Icons on every quick-info row**: star (rating), clock (hours),
+  currency (price), phone (phone), pin (address). Subtle grey SVGs
+  so they read as glyphs, not decoration.
+- **Price row** shows below the rating/hours when Google returned
+  price info.
+- **Phone row** with `tel:` link; hover underlines with the accent.
+- **Address row** with the formatted address as the visible label
+  and a trailing "Directions →" chip - the whole row links to
+  Google Maps directions. Replaces the previous "Directions" link
+  with the misread arrow icon.
+- **Full-week schedule dropdown** rebuilt: sectioned card, "Full
+  week" eyebrow label, right-aligned times with dashed dividers.
+  No longer the plain bulleted list.
+
 ## 0.7.5 - 2026-05-14
 
 Two real fixes chased down from your Eiger POI screenshot.
