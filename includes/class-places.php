@@ -73,6 +73,7 @@ final class Places {
         add_action( self::CRON_ALL, array( $this, 'cron_refresh_all' ) );
         add_action( 'init', array( $this, 'maybe_schedule_daily' ) );
         add_action( 'admin_post_innsight_places_refresh', array( $this, 'handle_admin_refresh' ) );
+        add_action( 'admin_post_innsight_places_test', array( $this, 'handle_admin_test' ) );
     }
 
     /**
@@ -131,25 +132,27 @@ final class Places {
 
     /**
      * Synchronously refresh the next N POIs that are missing or older
-     * than 30 days. Called from the "Refresh next 25 stale POIs" admin
-     * button. Returns the number of rows refreshed so the notice can
-     * tell the admin exactly how far they got.
+     * than 30 days. Returns a per-batch report so admins can see how
+     * many actually succeeded vs. failed vs. found nothing on Google.
+     *
+     * @return array{attempted:int, succeeded:int, failed:int, no_match:int}
      */
-    public function refresh_batch( int $size = 25 ): int {
+    public function refresh_batch( int $size = 25 ): array {
+        $report = array( 'attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'no_match' => 0 );
         $api_key = trim( (string) innsight_settings( 'google_places_key', '' ) );
-        if ( $api_key === '' ) return 0;
+        if ( $api_key === '' ) return $report;
 
         $plugin = \Innsight\Plugin::instance();
         try {
             $intermediate = $plugin->data_source()->build( array( 'post_id' => 0, 'viewmode' => 'multi' ) );
         } catch ( \Throwable $e ) {
-            return 0;
+            return $report;
         }
         $pois = array();
         foreach ( (array) ( $intermediate['pois'] ?? array() ) as $p ) {
             if ( ! empty( $p['id'] ) ) $pois[ (string) $p['id'] ] = $p;
         }
-        if ( empty( $pois ) ) return 0;
+        if ( empty( $pois ) ) return $report;
 
         global $wpdb;
         $table = self::table_name();
@@ -171,31 +174,120 @@ final class Places {
             if ( count( $todo ) >= $size ) break;
         }
 
-        $done = 0;
         foreach ( $todo as $id ) {
-            $this->refresh( $id, $pois[ $id ] );
-            $done++;
+            $report['attempted']++;
+            $result = $this->refresh( $id, $pois[ $id ] );
+            if ( $result === 'ok' )        $report['succeeded']++;
+            elseif ( $result === 'no_match' ) $report['no_match']++;
+            else                           $report['failed']++;
             usleep( 200 * 1000 );
         }
-        return $done;
+        return $report;
     }
 
     /**
-     * Admin-post handler for the "Refresh next 25 stale POIs" button
-     * in Settings. Verifies nonce + cap, runs one batch, redirects
-     * back with a query flag the admin page picks up to show a notice.
+     * Admin-post handler for the "Refresh next N POIs" button. Returns
+     * per-status counts so the admin sees whether the refresh actually
+     * pulled data or just wrote error rows.
      */
     public function handle_admin_refresh(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( esc_html__( 'Forbidden.', 'innsight' ) );
         }
         check_admin_referer( 'innsight_places_refresh' );
-        // 25 = same batch as the nightly cron. Long-running enough to
-        // catch progress, short enough to complete inside PHP's default
-        // max_execution_time even on modest hosts.
-        $done = $this->refresh_batch( 25 );
-        wp_safe_redirect( add_query_arg( 'innsight_places_done', (int) $done, wp_get_referer() ?: admin_url( 'admin.php?page=innsight' ) ) );
+        $report = $this->refresh_batch( 25 );
+        wp_safe_redirect( add_query_arg( array(
+            'innsight_places_done'     => (int) $report['succeeded'],
+            'innsight_places_failed'   => (int) $report['failed'],
+            'innsight_places_nomatch'  => (int) $report['no_match'],
+            'innsight_places_attempted' => (int) $report['attempted'],
+        ), wp_get_referer() ?: admin_url( 'admin.php?page=innsight' ) ) );
         exit;
+    }
+
+    /**
+     * Ping the Places API with a well-known query so an admin can
+     * verify their API key + billing setup without waiting for a
+     * cron cycle or a visitor to open a sheet. Returns a short
+     * status string with a human-readable outcome.
+     */
+    public function test_api_key(): array {
+        $api_key = trim( (string) innsight_settings( 'google_places_key', '' ) );
+        if ( $api_key === '' ) {
+            return array( 'ok' => false, 'message' => __( 'No API key configured.', 'innsight' ) );
+        }
+        try {
+            $res = wp_remote_post( 'https://places.googleapis.com/v1/places:searchText', array(
+                'timeout' => 8,
+                'headers' => array(
+                    'Content-Type'      => 'application/json',
+                    'X-Goog-Api-Key'    => $api_key,
+                    'X-Goog-FieldMask'  => 'places.id,places.displayName',
+                ),
+                'body'    => wp_json_encode( array( 'textQuery' => 'Eiffel Tower Paris', 'maxResultCount' => 1 ) ),
+            ) );
+            if ( is_wp_error( $res ) ) {
+                return array( 'ok' => false, 'message' => 'HTTP error: ' . $res->get_error_message() );
+            }
+            $code = (int) wp_remote_retrieve_response_code( $res );
+            $body = (string) wp_remote_retrieve_body( $res );
+            if ( $code === 200 ) {
+                $json = json_decode( $body, true );
+                if ( ! empty( $json['places'][0]['id'] ) ) {
+                    return array( 'ok' => true, 'message' => sprintf( __( 'OK - resolved "%s" (%s).', 'innsight' ), $json['places'][0]['displayName']['text'] ?? '?', $json['places'][0]['id'] ) );
+                }
+                return array( 'ok' => false, 'message' => __( 'API returned 200 but no places matched. Unexpected.', 'innsight' ) );
+            }
+            $err = '';
+            $json = json_decode( $body, true );
+            if ( isset( $json['error']['message'] ) ) $err = (string) $json['error']['message'];
+            return array( 'ok' => false, 'message' => 'HTTP ' . $code . ( $err ? ' - ' . $err : ' - ' . mb_substr( $body, 0, 200 ) ) );
+        } catch ( \Throwable $e ) {
+            return array( 'ok' => false, 'message' => 'Exception: ' . $e->getMessage() );
+        }
+    }
+
+    /**
+     * Admin-post handler for the "Test API key" button. Runs one
+     * Places search and stashes the result in a transient so the
+     * Settings page can render it after the redirect.
+     */
+    public function handle_admin_test(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Forbidden.', 'innsight' ) );
+        }
+        check_admin_referer( 'innsight_places_test' );
+        $result = $this->test_api_key();
+        set_transient( 'innsight_places_test_result', $result, MINUTE_IN_SECONDS * 5 );
+        wp_safe_redirect( add_query_arg( 'innsight_places_test', '1', wp_get_referer() ?: admin_url( 'admin.php?page=innsight' ) ) );
+        exit;
+    }
+
+    /**
+     * Return the most recent N rows for the debugger table on the
+     * Settings page. Includes error text so admins can see WHY the
+     * refresh isn't landing.
+     *
+     * @return array<int,array{poi_id:string,place_id:string,fetched_at:string,has_data:bool,error:?string}>
+     */
+    public function recent_activity( int $limit = 20 ): array {
+        global $wpdb;
+        $table = self::table_name();
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT poi_id, place_id, fetched_at, error, data IS NOT NULL AS has_data
+             FROM {$table} ORDER BY fetched_at DESC LIMIT %d",
+            max( 1, $limit )
+        ), ARRAY_A );
+        return array_map( static function ( $r ) {
+            return array(
+                'poi_id'     => (string) ( $r['poi_id'] ?? '' ),
+                'place_id'   => (string) ( $r['place_id'] ?? '' ),
+                'fetched_at' => (string) ( $r['fetched_at'] ?? '' ),
+                'has_data'   => ! empty( $r['has_data'] ),
+                'error'      => isset( $r['error'] ) && $r['error'] !== '' ? (string) $r['error'] : null,
+            );
+        }, (array) $rows );
     }
 
     /**
@@ -373,9 +465,17 @@ final class Places {
      * with a null data payload so the client doesn't hammer a broken
      * POI repeatedly.
      */
-    public function refresh( string $poi_id, array $poi_data ): void {
+    /**
+     * Refresh one POI. Returns a status string so callers can
+     * report success/failure without re-querying the DB:
+     *   'ok'        - data cached
+     *   'no_match'  - Google returned nothing for the query
+     *   'no_key'    - admin has no API key configured
+     *   'error'     - HTTP / API error (message stored in row)
+     */
+    public function refresh( string $poi_id, array $poi_data ): string {
         $api_key = trim( (string) innsight_settings( 'google_places_key', '' ) );
-        if ( $api_key === '' ) return;
+        if ( $api_key === '' ) return 'no_key';
 
         try {
             $place_id = isset( $poi_data['googlePlaceId'] ) && $poi_data['googlePlaceId'] !== ''
@@ -384,14 +484,16 @@ final class Places {
 
             if ( $place_id === '' ) {
                 $this->write_row( $poi_id, '', null, 'no_match' );
-                return;
+                return 'no_match';
             }
 
             $details = $this->fetch_details( $place_id, $api_key );
             $shaped  = $this->shape( $details, $api_key, $poi_data );
             $this->write_row( $poi_id, $place_id, $shaped, null );
+            return 'ok';
         } catch ( \Throwable $e ) {
             $this->write_row( $poi_id, isset( $place_id ) ? $place_id : '', null, mb_substr( $e->getMessage(), 0, 240 ) );
+            return 'error';
         }
     }
 

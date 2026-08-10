@@ -1,4 +1,29 @@
 # Changelog
+## 0.7.2 - 2026-05-14
+
+Places debugger. The refresh button used to lie ("25 done") even when
+every single Google request failed - because it counted attempts, not
+successes. Now it tells the truth AND shows you why:
+
+- **`refresh_batch()` returns a report** `{attempted, succeeded,
+  failed, no_match}` so the post-refresh notice reads "attempted 25,
+  succeeded 3, no-match 20, failed 2" - immediately obvious when the
+  API is rejecting requests.
+- **Colour-coded count tiles** on the status card: Total / Fresh /
+  Stale / Never fetched / Errored - all visible at a glance instead
+  of buried in a sentence.
+- **Recent activity table** (last 20 rows) with POI id, when fetched,
+  OK / No match / ERROR status, and the raw error message from
+  Google. Auto-expands when there are errors. This is the
+  "debugger" you needed.
+- **"Test API key" button** — pings the Places API with a known
+  query (Eiffel Tower) and reports the outcome inline. If your key
+  is wrong / billing isn't set up / referrer restrictions are
+  blocking, this shows the exact HTTP error before you touch a
+  single POI.
+- **Red callout when Places is off** — clearer than nothing at all
+  when the admin hasn't enabled + keyed the integration yet.
+
 ## 0.7.1 - 2026-05-14
 
 - **Google Places status card** on the Settings page: progress bar +

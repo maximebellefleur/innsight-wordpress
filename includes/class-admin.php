@@ -174,34 +174,65 @@ final class Admin {
     }
 
     /**
-     * Places enrichment status card. Sits above the settings form
-     * so admins can see at a glance how many POIs have Google data
-     * cached, and refresh the next 25 stale ones with one click.
-     * Hidden when Places enrichment is disabled or no API key set.
+     * Places enrichment status + debugger card. Sits above the
+     * settings form so admins can see:
+     *   - Progress bar (fresh / total)
+     *   - Attempted / Succeeded / Failed / No-match after the last refresh
+     *   - Recent activity table (last 20 rows with error messages)
+     *   - "Refresh now" + "Test API key" buttons
      */
     private function render_places_status_card(): void {
         $settings = innsight_settings();
         $enabled  = ! empty( $settings['google_places_enable'] ) && ! empty( $settings['google_places_key'] );
-        if ( ! $enabled ) return;
+        if ( ! $enabled ) {
+            echo '<div style="background:#fcf0f1;border-left:4px solid #d63638;padding:12px 14px;margin:14px 0;max-width:780px">';
+            echo '<p style="margin:0"><strong>' . esc_html__( 'Google Places enrichment is off.', 'innsight' ) . '</strong> ';
+            echo esc_html__( 'Enable it + paste an API key in the section below to start caching per-POI ratings, hours and reviews.', 'innsight' ) . '</p>';
+            echo '</div>';
+            return;
+        }
         if ( ! class_exists( '\\Innsight\\Places' ) ) return;
 
-        // Post-refresh success notice.
-        if ( isset( $_GET['innsight_places_done'] ) ) {
-            $done = (int) $_GET['innsight_places_done'];
-            echo '<div class="notice notice-success is-dismissible"><p>'
-                . sprintf( esc_html( _n( 'Refreshed %d POI from Google Places.', 'Refreshed %d POIs from Google Places.', $done, 'innsight' ) ), $done )
-                . '</p></div>';
+        // Post-refresh detailed report.
+        if ( isset( $_GET['innsight_places_attempted'] ) ) {
+            $att  = (int) $_GET['innsight_places_attempted'];
+            $done = (int) ( $_GET['innsight_places_done'] ?? 0 );
+            $fail = (int) ( $_GET['innsight_places_failed'] ?? 0 );
+            $nmat = (int) ( $_GET['innsight_places_nomatch'] ?? 0 );
+            $level = ( $fail > 0 && $done === 0 ) ? 'error' : ( ( $fail > 0 || $nmat > 0 ) ? 'warning' : 'success' );
+            echo '<div class="notice notice-' . esc_attr( $level ) . ' is-dismissible"><p><strong>'
+                . esc_html__( 'Places refresh complete', 'innsight' ) . ':</strong> '
+                . sprintf(
+                    esc_html__( 'attempted %1$d, succeeded %2$d, no-match %3$d, failed %4$d.', 'innsight' ),
+                    $att, $done, $nmat, $fail
+                );
+            if ( $fail > 0 ) {
+                echo ' <em>' . esc_html__( 'Scroll down to the debugger table to see the error messages.', 'innsight' ) . '</em>';
+            }
+            echo '</p></div>';
+        }
+
+        // Post-test result banner.
+        if ( ! empty( $_GET['innsight_places_test'] ) ) {
+            $result = get_transient( 'innsight_places_test_result' );
+            delete_transient( 'innsight_places_test_result' );
+            if ( is_array( $result ) ) {
+                $lvl = ! empty( $result['ok'] ) ? 'success' : 'error';
+                echo '<div class="notice notice-' . esc_attr( $lvl ) . ' is-dismissible"><p><strong>'
+                    . esc_html__( 'API test:', 'innsight' ) . '</strong> ' . esc_html( (string) $result['message'] ) . '</p></div>';
+            }
         }
 
         $places = \Innsight\Plugin::instance()->places();
         $s      = $places->status();
         $refresh_url = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_places_refresh' ), 'innsight_places_refresh' );
-        $cron_on   = ! empty( $settings['places_cron_enabled'] );
-        $next_cron = wp_next_scheduled( 'innsight_places_daily' );
+        $test_url    = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_places_test' ), 'innsight_places_test' );
+        $cron_on     = ! empty( $settings['places_cron_enabled'] );
+        $next_cron   = wp_next_scheduled( 'innsight_places_daily' );
 
         $pct = $s['total'] > 0 ? min( 100, (int) round( 100 * $s['fresh'] / $s['total'] ) ) : 0;
 
-        echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:12px 14px;margin:14px 0;max-width:780px">';
+        echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:12px 14px;margin:14px 0;max-width:920px">';
         echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'Google Places enrichment status', 'innsight' ) . '</strong></p>';
 
         // Progress bar.
@@ -209,17 +240,19 @@ final class Admin {
         echo '<div style="background:#2271b1;height:100%;width:' . (int) $pct . '%"></div>';
         echo '</div>';
 
-        echo '<p style="margin:0 0 8px;font-size:13px">'
-            . sprintf(
-                /* translators: 1=fresh, 2=total, 3=stale, 4=errored */
-                esc_html__( '%1$d of %2$d POIs cached with fresh Google data (< 30 days). %3$d stale/missing, %4$d errored.', 'innsight' ),
-                (int) $s['fresh'], (int) $s['total'], (int) ( $s['stale'] + ( $s['total'] - $s['cached'] ) ), (int) $s['errored']
-            )
-            . '</p>';
+        // Colour-coded counts.
+        $missing = max( 0, $s['total'] - $s['cached'] - $s['errored'] );
+        echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:8px 0 12px">';
+        $this->render_count_tile( __( 'Total POIs', 'innsight' ), (int) $s['total'], '#1e1e1e' );
+        $this->render_count_tile( __( 'Fresh (<30d)', 'innsight' ), (int) $s['fresh'], '#00a32a' );
+        $this->render_count_tile( __( 'Stale (>30d)', 'innsight' ), (int) $s['stale'], '#dba617' );
+        $this->render_count_tile( __( 'Never fetched', 'innsight' ), (int) $missing, '#646970' );
+        $this->render_count_tile( __( 'Errored', 'innsight' ), (int) $s['errored'], '#d63638' );
+        echo '</div>';
 
         if ( $s['last_fetch'] ) {
             $last_ago = human_time_diff( strtotime( $s['last_fetch'] . ' UTC' ), time() );
-            echo '<p style="margin:0 0 8px;font-size:12px;color:#646970">'
+            echo '<p style="margin:0 0 6px;font-size:12px;color:#646970">'
                 . sprintf( esc_html__( 'Last successful fetch: %s ago.', 'innsight' ), esc_html( $last_ago ) )
                 . '</p>';
         }
@@ -234,17 +267,63 @@ final class Admin {
                 . '</p>';
         }
 
+        // Buttons.
         $remaining = max( 0, $s['total'] - $s['fresh'] );
         if ( $remaining > 0 ) {
-            echo '<a href="' . esc_url( $refresh_url ) . '" class="button button-primary">'
+            echo '<a href="' . esc_url( $refresh_url ) . '" class="button button-primary" style="margin-right:6px">'
                 . sprintf( esc_html__( 'Refresh next %d POIs now', 'innsight' ), min( 25, $remaining ) )
                 . '</a>';
-            echo ' <span style="color:#646970;font-size:12px;margin-left:6px">'
-                . esc_html__( 'Runs synchronously; safe to click multiple times.', 'innsight' )
-                . '</span>';
         } else {
-            echo '<p style="margin:0;color:#00a32a;font-weight:600">' . esc_html__( 'All POIs fresh. Nothing to do.', 'innsight' ) . '</p>';
+            echo '<span style="color:#00a32a;font-weight:600;margin-right:12px">' . esc_html__( 'All POIs fresh. Nothing to refresh.', 'innsight' ) . '</span>';
         }
+        echo '<a href="' . esc_url( $test_url ) . '" class="button">' . esc_html__( 'Test API key', 'innsight' ) . '</a>';
+        echo ' <span style="color:#646970;font-size:12px;margin-left:8px">' . esc_html__( 'Pings Places API with a known query to verify your key + billing.', 'innsight' ) . '</span>';
+
+        // ─ Recent activity debugger ─
+        $activity = $places->recent_activity( 20 );
+        if ( ! empty( $activity ) ) {
+            echo '<details style="margin-top:16px" ' . ( ( $s['errored'] > 0 || ( isset( $_GET['innsight_places_failed'] ) && (int) $_GET['innsight_places_failed'] > 0 ) ) ? 'open' : '' ) . '>';
+            echo '<summary style="cursor:pointer;font-weight:600;font-size:13px">' . esc_html__( 'Recent activity (last 20 rows)', 'innsight' ) . '</summary>';
+            echo '<table class="wp-list-table widefat striped" style="margin-top:8px">';
+            echo '<thead><tr>';
+            echo '<th>' . esc_html__( 'POI id', 'innsight' ) . '</th>';
+            echo '<th>' . esc_html__( 'Fetched', 'innsight' ) . '</th>';
+            echo '<th>' . esc_html__( 'Status', 'innsight' ) . '</th>';
+            echo '<th>' . esc_html__( 'Google place id / error', 'innsight' ) . '</th>';
+            echo '</tr></thead><tbody>';
+            foreach ( $activity as $row ) {
+                $when = $row['fetched_at'] ? human_time_diff( strtotime( $row['fetched_at'] . ' UTC' ), time() ) . ' ago' : '—';
+                if ( $row['has_data'] ) {
+                    $status_html = '<span style="color:#00a32a;font-weight:600">' . esc_html__( 'OK', 'innsight' ) . '</span>';
+                    $detail_html = $row['place_id'] !== '' ? '<code style="font-size:11px">' . esc_html( $row['place_id'] ) . '</code>' : '—';
+                } else {
+                    $err = $row['error'] ?? 'unknown';
+                    if ( $err === 'no_match' ) {
+                        $status_html = '<span style="color:#dba617;font-weight:600">' . esc_html__( 'No match', 'innsight' ) . '</span>';
+                        $detail_html = '<em style="color:#646970">' . esc_html__( 'Google returned no place for the POI title / location.', 'innsight' ) . '</em>';
+                    } else {
+                        $status_html = '<span style="color:#d63638;font-weight:600">' . esc_html__( 'ERROR', 'innsight' ) . '</span>';
+                        $detail_html = '<code style="font-size:11px;color:#d63638">' . esc_html( $err ) . '</code>';
+                    }
+                }
+                echo '<tr>';
+                echo '<td><code style="font-size:11px">' . esc_html( $row['poi_id'] ) . '</code></td>';
+                echo '<td>' . esc_html( $when ) . '</td>';
+                echo '<td>' . $status_html . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped above
+                echo '<td>' . $detail_html . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped above
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+            echo '</details>';
+        }
+
+        echo '</div>';
+    }
+
+    private function render_count_tile( string $label, int $value, string $accent ): void {
+        echo '<div style="background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:8px 10px">';
+        echo '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#646970">' . esc_html( $label ) . '</div>';
+        echo '<div style="font-size:20px;font-weight:600;line-height:1.1;margin-top:2px;color:' . esc_attr( $accent ) . ';font-variant-numeric:tabular-nums">' . (int) $value . '</div>';
         echo '</div>';
     }
 
