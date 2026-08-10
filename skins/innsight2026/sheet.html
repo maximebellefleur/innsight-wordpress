@@ -25,18 +25,43 @@
 <div class="in-sheet__meta">
     <span class="in-sheet__catdot" style="background:{{categoryColor}}"></span>
     <span class="in-sheet__catlabel">{{categoryLabel}}</span>
-    <span class="in-sheet__sep">·</span>
-    <span class="in-sheet__dist">{{dist}}</span>
-    {{#if hours}}<span class="in-sheet__sep">·</span>
-    <span class="in-sheet__open" data-open="{{open}}">{{openLabel}}</span>{{/if}}
-    {{#if enrichLoading}}<span class="in-sheet__sep">·</span>
-    <span class="in-sheet__enriching"><span class="in-sheet__enriching-dot" aria-hidden="true"></span>Looking up live details…</span>{{/if}}
+    {{#if dist}}<span class="in-sheet__sep">·</span>
+    <span class="in-sheet__dist">{{dist}}</span>{{/if}}
 </div>
 
 <h2 class="in-sheet__title">{{title}}</h2>
 
-{{#if hours}}<div class="in-sheet__hours">{{hours}}</div>{{/if}}
-{{#if enrichLoading}}<div class="in-sheet__hours in-sheet__hours--placeholder" aria-hidden="true">&nbsp;</div>{{/if}}
+{{#if hasGoogleStrip}}
+<div class="in-sheet__gstrip" data-enrich="{{enrichPending}}">
+    <div class="in-sheet__gstrip-row">
+        {{#if ratingLabel}}<a class="in-sheet__gitem in-sheet__gitem--rating" href="{{reviewsUri}}" target="_blank" rel="noopener" aria-label="See top Google reviews">
+            <span aria-hidden="true">★</span> {{ratingLabel}}
+        </a>{{/if}}
+        {{#if hours}}<span class="in-sheet__gitem in-sheet__gitem--hours">
+            <span class="in-sheet__gopen" data-open="{{open}}">{{openLabel}}</span>
+            · {{hours}}
+            {{#if weekdayHours}}<button type="button" class="in-sheet__gsched-toggle" data-innsight-sched-toggle aria-expanded="false">see all</button>{{/if}}
+        </span>{{/if}}
+    </div>
+    {{#if weekdayHours}}
+    <ul class="in-sheet__gsched" data-innsight-sched hidden>
+        {{#each weekdayHours}}<li>{{value}}</li>{{/each}}
+    </ul>
+    {{/if}}
+    {{#if directionsUri}}<a class="in-sheet__gdir" href="{{directionsUri}}" target="_blank" rel="noopener">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M6 1l4 4M6 1L2 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Directions
+    </a>{{/if}}
+</div>
+{{/if}}
+{{#if enrichPending}}{{#unless hasGoogleStrip}}
+<div class="in-sheet__gstrip in-sheet__gstrip--skeleton" aria-hidden="true">
+    <div class="in-sheet__gstrip-row">
+        <span class="in-sheet__gitem in-sheet__gitem--skel"></span>
+        <span class="in-sheet__gitem in-sheet__gitem--skel in-sheet__gitem--skel-wide"></span>
+    </div>
+</div>
+{{/unless}}{{/if}}
 
 {{#if blurb}}<div class="in-sheet__blurb">{{{blurb}}}</div>{{/if}}
 
@@ -44,8 +69,6 @@
 <div class="in-sheet__vibelabel">The vibe</div>
 <div class="in-sheet__vibewrap">
     {{#each vibeTags}}<span class="in-sheet__tag">{{value}}</span>{{/each}}
-    {{#if ratingLabel}}<span class="in-sheet__tag in-sheet__tag--rating">★ {{ratingLabel}}</span>{{/if}}
-    {{#if enrichLoading}}{{#unless ratingLabel}}<span class="in-sheet__tag in-sheet__tag--placeholder" aria-hidden="true">★ —</span>{{/unless}}{{/if}}
 </div>
 {{/if}}
 
@@ -69,10 +92,6 @@
     {{#if button.url}}<a class="in-sheet__act in-sheet__act--primary" href="{{button.url}}" target="_blank" rel="noopener">{{button.text}}</a>{{/if}}
     {{#unless button.url}}<button class="in-sheet__act in-sheet__act--primary" data-innsight-more-info>More info</button>{{/unless}}
 </div>
-
-{{#if googleMapsUri}}
-<a class="in-sheet__gmaps" href="{{googleMapsUri}}" target="_blank" rel="noopener">View on Google Maps →</a>
-{{/if}}
 
 <!-- Personal-note pull-up. The strip sits at the bottom of the sheet,
      showing only a small downward arrow + label + the very top edge of the

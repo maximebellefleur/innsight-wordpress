@@ -102,7 +102,8 @@ final class Admin {
         $this->add_field( 'google_maps_api_key', __( 'Google Maps API key (v0.2)', 'innsight' ), 'innsight_provider', 'render_text', __( 'Reserved for the Google Maps provider, which lands in v0.2. Save now to skip the second trip.', 'innsight' ) );
 
         $this->add_field( 'google_places_enable', __( 'Enable Google Places enrichment', 'innsight' ), 'innsight_enrichment', 'render_checkbox' );
-        $this->add_field( 'google_places_key', __( 'Google Places API key', 'innsight' ), 'innsight_enrichment', 'render_text' );
+        $this->add_field( 'google_places_key', __( 'Google Places API key', 'innsight' ), 'innsight_enrichment', 'render_text', __( 'Stored server-side and never sent to the browser. Enrichment fetches happen through /wp-json/innsight/v1/places with a 30-day cache in a custom table.', 'innsight' ) );
+        $this->add_field( 'places_cron_enabled', __( 'Nightly Places cron', 'innsight' ), 'innsight_enrichment', 'render_checkbox', __( 'Runs at 03:00 site time; refreshes up to 25 stale POIs per night so most sheet opens hit a hot cache. Leave off if API quota matters more than latency on first open.', 'innsight' ) );
 
         $this->add_field( 'render_mode', __( 'Render mode', 'innsight' ), 'innsight_render', 'render_render_mode' );
         $this->add_field( 'kml_export', __( 'Show KML download button', 'innsight' ), 'innsight_render', 'render_checkbox' );

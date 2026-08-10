@@ -1280,42 +1280,132 @@ body.innsight-sheet-locked {
     .in-livedot__pulse { animation: none !important; opacity: 0.2; }
 }
 
-/* ── v0.5.0 - Google Places loading state ────────────────────────────────── */
-.in-sheet__enriching {
+/* ── v0.7.0 - Google info strip (subtle, single line) ───────────────────── */
+
+/* Sits right under the title, above blurb + actions. Compact, low-
+ * visual-weight so it never fights the title / description. Rating
+ * links out to Google reviews; hours show today's + a "see all"
+ * toggle for the full weekday list; directions is a small link
+ * underneath. When the server-side cache is empty and enrichment is
+ * pending, the whole strip renders as a shimmer skeleton (below). */
+.in-sheet__gstrip {
+    margin: 8px 0 14px;
+    font-size: 13px;
+    color: var(--in-mute3);
+    line-height: 1.35;
+}
+.in-sheet__gstrip-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+}
+.in-sheet__gitem {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    color: var(--in-mute2);
-    font-size: 11px;
-    font-style: italic;
+    gap: 4px;
+    color: var(--in-ink);
+    text-decoration: none;
 }
-.in-sheet__enriching-dot {
-    width: 6px; height: 6px; border-radius: 50%;
+.in-sheet__gitem--rating {
+    font-weight: 600;
+    color: var(--in-ink) !important;
+    text-decoration: none !important;
     background: var(--in-accent);
-    animation: in-pulse 1.6s ease-in-out infinite;
+    border: 1px solid var(--in-ink);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 12px;
+    transition: transform 120ms;
 }
-.in-sheet__hours--placeholder {
-    height: 18px; width: 60%;
-    border-radius: 6px;
-    background: linear-gradient(90deg, rgba(15,15,15,0.06) 25%, rgba(15,15,15,0.12) 50%, rgba(15,15,15,0.06) 75%);
+.in-sheet__gitem--rating:hover { transform: translate(1px, 1px); }
+.in-sheet__gitem--hours {
+    font-size: 12.5px;
+    color: var(--in-mute3);
+}
+.in-sheet__gopen { font-weight: 600; }
+.in-sheet__gopen[data-open="true"]  { color: var(--in-open); }
+.in-sheet__gopen[data-open="false"] { color: var(--in-closed); }
+.in-sheet__gsched-toggle {
+    background: transparent;
+    border: 0;
+    padding: 0 0 0 4px;
+    color: var(--in-mute) !important;
+    font: inherit;
+    font-size: 11.5px;
+    text-decoration: underline var(--in-accent) 2px;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.in-sheet__gsched {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 8px 12px;
+    background: var(--in-bg);
+    border: 1px solid var(--in-divider);
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    animation: in-gsched-pop 200ms ease backwards;
+}
+.in-sheet__gsched[hidden] { display: none; }
+.in-sheet__gsched li { color: var(--in-ink); }
+
+/* Directions link - subtle, plain-underline, doesn't compete with the
+ * primary Save/More-info action row below. */
+.in-sheet__gdir {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--in-mute3) !important;
+    text-decoration: none !important;
+    letter-spacing: 0.02em;
+}
+.in-sheet__gdir:hover { color: var(--in-ink) !important; }
+.in-sheet__gdir svg { transform: rotate(-45deg); }
+
+/* Loading state: blur + a bumping pulse on the whole strip while the
+ * server refreshes the cache in the background. Applied via
+ * data-enrich="true" that buildSheetContext sets from enrichPending.
+ * Skeleton variant when there's no cached data at all so the visitor
+ * still sees where the info will appear. */
+.in-sheet__gstrip[data-enrich="true"] {
+    filter: blur(1.2px);
+    animation: in-gstrip-bump 1.8s ease-in-out infinite;
+}
+.in-sheet__gstrip--skeleton {
+    opacity: 0.9;
+    animation: in-gstrip-bump 1.8s ease-in-out infinite;
+}
+.in-sheet__gitem--skel {
+    display: inline-block;
+    height: 20px;
+    width: 60px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(15,15,15,0.08) 25%, rgba(15,15,15,0.14) 50%, rgba(15,15,15,0.08) 75%);
     background-size: 200% 100%;
     animation: in-shimmer 1.4s linear infinite;
-    margin-bottom: 14px;
 }
-.in-sheet__tag--placeholder {
-    background: rgba(15,15,15,0.06);
-    color: var(--in-mute2);
-    border-color: var(--in-divider);
-    font-style: italic;
-    animation: in-shimmer-soft 1.6s ease-in-out infinite;
+.in-sheet__gitem--skel-wide { width: 180px; }
+@keyframes in-gstrip-bump {
+    0%, 100% { transform: translateY(0);     opacity: 1; }
+    50%      { transform: translateY(-2px);  opacity: 0.75; }
+}
+@keyframes in-gsched-pop {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes in-shimmer {
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
-@keyframes in-shimmer-soft {
-    0%, 100% { opacity: 0.55; }
-    50%      { opacity: 1;    }
+@media (prefers-reduced-motion: reduce) {
+    .in-sheet__gstrip[data-enrich="true"],
+    .in-sheet__gstrip--skeleton { animation: none !important; filter: none !important; }
+    .in-sheet__gitem--skel { animation: none !important; }
 }
 
 /* ── v0.5.0 - Personal note pull-up ──────────────────────────────────────── */

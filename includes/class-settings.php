@@ -47,6 +47,13 @@ final class Settings {
             'google_places_key'    => '',
             'google_places_fields' => array( 'photos', 'opening_hours', 'rating' ),
 
+            // Nightly cron that pre-fetches Google Places data for every
+            // POI whose cache is missing or older than 30 days. When off,
+            // enrichment still lazy-loads on the first sheet open per
+            // POI (with stale-while-revalidate on repeat opens). When
+            // on, most sheet opens hit a hot cache.
+            'places_cron_enabled'  => 0,
+
             // UI defaults the engine respects.
             'kml_export'           => 1,
             'solo_mode'            => 1,
@@ -131,6 +138,7 @@ final class Settings {
         $clean['google_places_fields'] = isset( $raw['google_places_fields'] ) && is_array( $raw['google_places_fields'] )
             ? array_values( array_intersect( array( 'photos', 'opening_hours', 'rating' ), $raw['google_places_fields'] ) )
             : $defaults['google_places_fields'];
+        $clean['places_cron_enabled']  = ! empty( $raw['places_cron_enabled'] ) ? 1 : 0;
         $clean['kml_export']           = ! empty( $raw['kml_export'] ) ? 1 : 0;
         $clean['solo_mode']            = ! empty( $raw['solo_mode'] ) ? 1 : 0;
         $clean['live_location']        = ! empty( $raw['live_location'] ) ? 1 : 0;

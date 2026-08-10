@@ -1,4 +1,60 @@
 # Changelog
+## 0.7.0 - 2026-05-14
+
+Google Places moved server-side + Google info strip on every POI sheet.
+
+### Server-side Places
+
+- **New `Places` service + `innsight_places` custom table** (`poi_id`,
+  `place_id`, `data JSON`, `fetched_at`, `error`). API key stays on
+  the server — never touches a visitor's browser.
+- **`/wp-json/innsight/v1/places`** returns cached data with
+  stale-while-revalidate flags: fresh cache → instant; stale (>30d)
+  cache → return old data + kick off async refresh (single-shot
+  `wp_cron` event, runs seconds later); missing cache → return
+  `data:null, refreshing:true` + kick off refresh.
+- **Client polls once at +5 s** when the server says `refreshing:true`.
+  If the second poll's `fetchedAt` is newer, the skin merges the fresh
+  data and toasts "Info updated" so the visitor understands why the
+  hours / rating just changed.
+- **30-day TTL.** Old cache still shown while the fresh one is being
+  fetched — no blank sheet.
+
+### Nightly cron (opt-in)
+
+- New setting **"Nightly Places cron"** (default off). When enabled,
+  a daily 03:00 site-time event iterates POIs and refreshes up to 25
+  stale/missing rows per night (bounded batch, 200 ms politeness
+  pause). Most sheet opens hit a hot cache; per-visit Google requests
+  drop to near zero.
+
+### Google info strip in the sheet
+
+Sits directly under the POI title, above the description. Compact and
+subtle, one row when possible:
+
+- **Rating pill** (accent bg) linking to the Google reviews page.
+- **Today's hours** with open/closed status badge and a **"see all"**
+  toggle that expands a 7-day weekday schedule inline.
+- **Directions link** underneath — always present (built from POI
+  lat/lon even without Places enrichment), opens Google Maps
+  directions to the POI's coordinates.
+
+Loading state: when the strip is present but data hasn't landed yet,
+CSS **blurs + pulses** the whole strip so the visitor sees "something
+is loading here". When there's no cached data at all, a skeleton
+shimmer variant shows the shape before data lands.
+
+### Cleanup
+
+- Removed the redundant "View on Google Maps →" link at the bottom
+  of the sheet (Directions in the new strip replaces it).
+- Removed the meta-row open badge + vibe rating chip (now consolidated
+  in the Google strip).
+- Old client-side `engine/enrichment/google-places.js` rewritten as a
+  thin REST client (~90 lines, no more Places API calls from the
+  browser).
+
 ## 0.6.0 - 2026-05-14
 
 Analytics module. Privacy-friendly aggregate usage counts + a

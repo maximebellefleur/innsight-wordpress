@@ -102,6 +102,12 @@ final class JsonBuilder {
                 'analyticsUrl' => ! empty( $settings['analytics_enabled'] ?? 1 )
                     ? esc_url_raw( rest_url( 'innsight/v1/stat' ) )
                     : '',
+                // Server-side Places endpoint. Empty when Places
+                // enrichment is disabled (no API key) so the skin
+                // simply doesn't try to fetch enrichment.
+                'placesUrl'    => ( ! empty( $settings['google_places_enable'] ) && ! empty( $settings['google_places_key'] ) )
+                    ? esc_url_raw( rest_url( 'innsight/v1/places' ) )
+                    : '',
             ),
             'pois'         => array_map( array( $this, 'shape_poi' ), $intermediate['pois'] ),
             'paths'        => array_map( array( $this, 'shape_path' ), $intermediate['paths'] ),

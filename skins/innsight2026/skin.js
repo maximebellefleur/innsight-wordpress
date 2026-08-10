@@ -801,7 +801,10 @@
             if (data.userRatingCount != null) poi.userRatingCount = data.userRatingCount;
             if (data.openNow != null)         poi.open = data.openNow;
             if (data.todaysHours)             poi.hours = data.todaysHours;
+            if (data.weekdayHours)            poi.weekdayHours = data.weekdayHours;
             if (data.googleMapsUri)           poi.googleMapsUri = data.googleMapsUri;
+            if (data.reviewsUri)              poi.reviewsUri = data.reviewsUri;
+            if (data.directionsUri)           poi.directionsUri = data.directionsUri;
             if (data.websiteUri && poi.button && !poi.button.url) {
                 poi.button.url = data.websiteUri;
                 if (!poi.button.text) poi.button.text = 'Website';
@@ -815,6 +818,11 @@
             // have already swiped to the next one).
             if (self.sheet.poi && String(self.sheet.poi.id) === id) {
                 self.renderSheet();
+                // When the server-side cache returned a stale row and
+                // then a fresher one landed 5 s later, mark the poll as
+                // an update and toast it. Subtle "Info updated" so the
+                // visitor understands why hours/rating just changed.
+                if (data._updated) self.showToast('Info updated');
             }
         });
     };
@@ -903,6 +911,18 @@
         var notePreview = inner.querySelector('[data-innsight-note-preview]');
         if (notePreview) {
             notePreview.addEventListener('click', function () { self.openNotesPanel(); });
+        }
+        // "see all" toggles the full weekday-schedule list in the
+        // Google info strip. Compact by default so the strip stays a
+        // single row.
+        var schedToggle = inner.querySelector('[data-innsight-sched-toggle]');
+        var schedList   = inner.querySelector('[data-innsight-sched]');
+        if (schedToggle && schedList) {
+            schedToggle.addEventListener('click', function () {
+                var open = !schedList.hasAttribute('hidden');
+                if (open) { schedList.setAttribute('hidden', ''); schedToggle.setAttribute('aria-expanded', 'false'); schedToggle.textContent = 'see all'; }
+                else      { schedList.removeAttribute('hidden'); schedToggle.setAttribute('aria-expanded', 'true'); schedToggle.textContent = 'hide'; }
+            });
         }
         // "More info" toggles a Featured-in popover above the actions.
         // The popover is rendered hidden in sheet.html and revealed by
@@ -1112,6 +1132,25 @@
         // Posts that reference this POI - drives the "Featured in"
         // popover under the More-info button.
         ctx.referencedBy = Array.isArray(poi.referencedBy) ? poi.referencedBy : [];
+        // Google-info strip fields. Rating link -> Google reviews page,
+        // hours today + weekly (rendered in a collapsible sub-block),
+        // directions link -> Google Maps with the POI's lat/lon. The
+        // directionsUri always resolves even without Places enrichment
+        // because we can build it from lat/lon directly.
+        ctx.reviewsUri = poi.reviewsUri || poi.googleMapsUri || '';
+        ctx.directionsUri = poi.directionsUri || (
+            isFinite(poi.lat) && isFinite(poi.lon)
+                ? 'https://www.google.com/maps/dir/?api=1&destination=' + poi.lat + ',' + poi.lon
+                : ''
+        );
+        ctx.weekdayHours = Array.isArray(poi.weekdayHours)
+            ? poi.weekdayHours.map(function (h) { return { value: h }; })
+            : [];
+        ctx.hasGoogleStrip = !!(ctx.rating || ctx.hours || ctx.directionsUri);
+        // Enrichment expected but data not landed yet - the CSS uses
+        // this class on the sheet inner to blur + pulse the strip so
+        // the visitor knows something's coming.
+        ctx.enrichPending = ctx.enrichLoading;
         // Stash for navigation.
         this.sheet.siblings = siblings;
         this.sheet.idx = idx;

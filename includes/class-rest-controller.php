@@ -25,11 +25,14 @@ final class RestController {
     private $json_builder;
     /** @var Stats|null */
     private $stats;
+    /** @var Places|null */
+    private $places;
 
-    public function __construct( DataSource $data_source, JsonBuilder $json_builder, ?Stats $stats = null ) {
+    public function __construct( DataSource $data_source, JsonBuilder $json_builder, ?Stats $stats = null, ?Places $places = null ) {
         $this->data_source  = $data_source;
         $this->json_builder = $json_builder;
         $this->stats        = $stats;
+        $this->places       = $places;
     }
 
     public function register(): void {
@@ -80,6 +83,45 @@ final class RestController {
                         'default'           => '',
                     ),
                     'taxonomy_id'   => array(
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                        'default'           => '',
+                    ),
+                ),
+            )
+        );
+
+        // Places enrichment endpoint. Returns cached Google Places data
+        // for a POI, kicks off an async refresh when the cache is stale
+        // or missing. Server-side so the Google API key never touches
+        // a visitor's browser.
+        register_rest_route(
+            'innsight/v1',
+            '/places',
+            array(
+                'methods'             => \WP_REST_Server::READABLE,
+                'permission_callback' => array( $this, 'permission_check' ),
+                'callback'            => array( $this, 'handle_places' ),
+                'args'                => array(
+                    'poi_id' => array(
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                        'required'          => true,
+                    ),
+                    'title'  => array(
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                        'default'           => '',
+                    ),
+                    'lat'    => array(
+                        'type'              => 'number',
+                        'default'           => 0,
+                    ),
+                    'lon'    => array(
+                        'type'              => 'number',
+                        'default'           => 0,
+                    ),
+                    'place_id' => array(
                         'type'              => 'string',
                         'sanitize_callback' => 'sanitize_text_field',
                         'default'           => '',
@@ -171,6 +213,39 @@ final class RestController {
         }
         set_transient( $key, $n + 1, MINUTE_IN_SECONDS );
         return apply_filters( 'innsight/rest/stat_permission', true, $request );
+    }
+
+    /**
+     * Return the Places payload for a POI. Response shape:
+     *   { data: {rating, todaysHours, weekdayHours, directionsUri, reviewsUri, ...} | null,
+     *     fetchedAt: 'YYYY-MM-DD HH:MM:SS' | null,
+     *     stale:      boolean,
+     *     refreshing: boolean }
+     *
+     * Clients that see refreshing:true should re-poll after ~5s to
+     * pick up the fresh row - the server has scheduled a single-shot
+     * cron event that populates the cache in the background.
+     */
+    public function handle_places( \WP_REST_Request $request ): \WP_REST_Response {
+        if ( ! $this->places ) {
+            $r = new \WP_REST_Response( array( 'data' => null, 'refreshing' => false ), 200 );
+            $r->header( 'Cache-Control', 'no-store' );
+            return $r;
+        }
+        $poi_id = (string) $request->get_param( 'poi_id' );
+        $poi    = array(
+            'id'            => $poi_id,
+            'title'         => (string) $request->get_param( 'title' ),
+            'lat'           => (float) $request->get_param( 'lat' ),
+            'lon'           => (float) $request->get_param( 'lon' ),
+            'googlePlaceId' => (string) $request->get_param( 'place_id' ),
+        );
+        $out = $this->places->get_for_visitor( $poi_id, $poi );
+        $r   = new \WP_REST_Response( $out, 200 );
+        // The polling client needs uncached responses so it can see the
+        // async refresh land within seconds.
+        $r->header( 'Cache-Control', 'no-store, no-cache, must-revalidate' );
+        return $r;
     }
 
     /**

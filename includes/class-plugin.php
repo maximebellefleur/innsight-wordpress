@@ -59,6 +59,8 @@ final class Plugin {
     private $stats;
     /** @var AnalyticsPage */
     private $analytics_page;
+    /** @var Places */
+    private $places;
     /** @var bool */
     private $booted = false;
 
@@ -89,7 +91,8 @@ final class Plugin {
         $this->assets          = new Assets();
         $this->shortcode       = new Shortcode( $this->data_source, $this->json_builder, $this->skin_partials, $this->assets );
         $this->stats           = new Stats();
-        $this->rest_controller = new RestController( $this->data_source, $this->json_builder, $this->stats );
+        $this->places          = new Places();
+        $this->rest_controller = new RestController( $this->data_source, $this->json_builder, $this->stats, $this->places );
         $this->analytics_page  = new AnalyticsPage( $this->stats );
         $this->kml_export      = new KmlExport( $this->data_source );
         $this->admin           = new Admin();
@@ -128,6 +131,7 @@ final class Plugin {
             'cache_manager'   => $this->cache_manager,
             'stats'           => $this->stats,
             'analytics_page'  => $this->analytics_page,
+            'places'          => $this->places,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
@@ -145,6 +149,7 @@ final class Plugin {
         $this->kml_export->register();
         $this->assets->register();
         $this->cache_manager->register();
+        $this->places->register();
         if ( is_admin() ) {
             $this->admin->register();
             $this->defaults_page->register();
@@ -160,6 +165,8 @@ final class Plugin {
     public function json_builder(): JsonBuilder { return $this->json_builder; }
     public function skin_partials(): SkinPartials { return $this->skin_partials; }
     public function assets(): Assets { return $this->assets; }
+    public function places(): Places { return $this->places; }
+    public function stats(): Stats { return $this->stats; }
     public function legacy_compat(): LegacyCompat { return $this->legacy_compat; }
     public function defaults_page(): DefaultsPage { return $this->defaults_page; }
     public function poi_post_type(): PoiPostType { return $this->poi_post_type; }
