@@ -94,6 +94,14 @@ final class JsonBuilder {
                 'layerControl' => array( 'position' => 'bottomright', 'collapsed' => false ),
                 'liveLocation' => $this->build_live_location_config( $settings ),
                 'share'        => $this->build_share_config( $settings ),
+                // Analytics beacon URL. Empty string when disabled so
+                // the skin's beacon() early-returns without a network
+                // call. When enabled, the skin fires anonymous event
+                // counts into the innsight_stats table (map_load,
+                // poi_open, poi_save, etc).
+                'analyticsUrl' => ! empty( $settings['analytics_enabled'] ?? 1 )
+                    ? esc_url_raw( rest_url( 'innsight/v1/stat' ) )
+                    : '',
             ),
             'pois'         => array_map( array( $this, 'shape_poi' ), $intermediate['pois'] ),
             'paths'        => array_map( array( $this, 'shape_path' ), $intermediate['paths'] ),

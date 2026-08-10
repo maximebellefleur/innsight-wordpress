@@ -164,6 +164,38 @@
         return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
     };
 
+    /* ── Analytics beacon ────────────────────────────────────────────────── */
+
+    /**
+     * Fire-and-forget event beacon. Uses navigator.sendBeacon when
+     * available (survives page unload, doesn't block the pointer
+     * handler that queued it), falls back to fetch with keepalive.
+     * Silently no-ops when analytics are disabled or the endpoint URL
+     * isn't in the config. Never throws - a beacon failure must never
+     * affect the visitor's UX.
+     */
+    SkinController.prototype.beacon = function (event, poiId) {
+        try {
+            var url = this.cfg && this.cfg.ui && this.cfg.ui.analyticsUrl;
+            if (!url || !event) return;
+            var body = JSON.stringify({ event: event, poi_id: poiId || '' });
+            if (root.navigator && root.navigator.sendBeacon) {
+                // Blob type kept as application/json so WP REST parses
+                // the body into params via json request-body handler.
+                var blob = new Blob([body], { type: 'application/json' });
+                root.navigator.sendBeacon(url, blob);
+                return;
+            }
+            root.fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: body,
+                keepalive: true,
+                credentials: 'omit'
+            }).catch(function () {});
+        } catch (e) { /* swallow - beacons are never critical */ }
+    };
+
     SkinController.prototype.boot = function () {
         // PWA cleanup runs first so a stale yuna service worker can't keep
         // serving an old engine/skin from cache.
@@ -191,6 +223,8 @@
         // chip if the user previously chose Preview and is mid-session.
         this.consumeShareUrl();
         this.restoreSharedPicksChip();
+        // Analytics: one map_load per successful boot.
+        this.beacon('map_load');
     };
 
     /* ── PWA hygiene ─────────────────────────────────────────────────────── */
@@ -719,6 +753,11 @@
         // stable across save/unsave taps - no sheet re-render needed.
         this.app.classList.toggle('is-poi-saved', this.isPoiSaved(poi));
         this.renderSheet();
+        // Analytics: one poi_open per sheet open (marker click, list row,
+        // saved row, share preview row). navigateSheet uses renderSheet
+        // directly without going through openSheet so swipe navigation
+        // is NOT counted as a fresh open - accurate to visitor intent.
+        this.beacon('poi_open', poi && poi.id);
         this.app.classList.add('is-sheet-open');
         // Lock the document scroll so iOS Safari + Chrome Android don't fire
         // their native pull-to-refresh while the user is dragging the sheet.
@@ -954,6 +993,7 @@
             this.app.classList.remove('is-poi-saved');
             this.showToast('Removed from saved');
             this.state.events.emit('sheet:save', { poi: poi, saved: false });
+            this.beacon('poi_unsave', poi && poi.id);
         } else {
             // Self-contained snapshot: enough to render the saved row +
             // re-open the sheet later, even if the POI is later removed
@@ -980,6 +1020,7 @@
             this.app.classList.add('is-poi-saved');
             this.showToast('Saved!');
             this.state.events.emit('sheet:save', { poi: poi, saved: true });
+            this.beacon('poi_save', poi && poi.id);
         }
         // If we're currently on the Saved tab, re-render it so the row
         // appears/disappears immediately.
@@ -1883,6 +1924,11 @@
             return;
         }
 
+        // Analytics: one share_send per successful dispatch. Channel is
+        // stashed in the poi_id slot since it's a compact tag and
+        // aggregate stats care about "which channel wins".
+        this.beacon('share_send', 'ch:' + channel);
+
         switch (channel) {
             case 'native':
                 if (root.navigator && root.navigator.share) {
@@ -1963,6 +2009,7 @@
             // Stash for the session so the dancing chip survives navigation
             // between tabs (but not a full new tab open).
             try { root.sessionStorage.setItem(SHARED_PICKS_KEY, JSON.stringify(picks)); } catch (e) {}
+            this.beacon('share_received', String(picks.length));
             this.showReceivePopup(picks);
             // Clean both URL forms so a manual reload doesn't re-pop the
             // modal. history.replaceState gives a tidy URL without a

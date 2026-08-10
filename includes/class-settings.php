@@ -92,6 +92,13 @@ final class Settings {
             'share_preview_label'     => 'Just preview',
             'share_save_all_label'    => 'Save them all',
             'share_chip_label'        => "Friend's picks",
+
+            // Analytics: opt-in privacy-friendly aggregate counts of
+            // map loads, POI opens/saves/unsaves, shares sent/received.
+            // No visitor identity, no IP stored, day-bucketed
+            // aggregates only. On by default; admins who want zero
+            // telemetry can flip this off in Settings.
+            'analytics_enabled'       => 1,
         );
     }
 
@@ -157,6 +164,8 @@ final class Settings {
         foreach ( $share_text_keys as $sk ) {
             $clean[ $sk ] = isset( $raw[ $sk ] ) ? wp_strip_all_tags( (string) $raw[ $sk ] ) : (string) ( $defaults[ $sk ] ?? '' );
         }
+
+        $clean['analytics_enabled']    = ! empty( $raw['analytics_enabled'] ) ? 1 : 0;
 
         return $clean;
     }

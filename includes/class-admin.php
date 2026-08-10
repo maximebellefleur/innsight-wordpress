@@ -84,6 +84,7 @@ final class Admin {
         add_settings_section( 'innsight_enrichment', __( 'Google Places enrichment', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_render', __( 'Render mode & UI', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_share', __( 'Share wishlist', 'innsight' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'innsight_analytics', __( 'Analytics', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_geocoder', __( 'Geocoder', 'innsight' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'engine_source', __( 'Engine source', 'innsight' ), 'innsight_engine', 'render_engine_source' );
@@ -117,6 +118,8 @@ final class Admin {
         $this->add_field( 'share_preview_label', __( 'Receive popup - preview button', 'innsight' ), 'innsight_share', 'render_text' );
         $this->add_field( 'share_save_all_label', __( 'Receive popup - save-all button', 'innsight' ), 'innsight_share', 'render_text' );
         $this->add_field( 'share_chip_label', __( "Friend's-picks chip label", 'innsight' ), 'innsight_share', 'render_text', __( 'Label shown on the dancing chip in the filter bar after the recipient picks "Just preview".', 'innsight' ) );
+
+        $this->add_field( 'analytics_enabled', __( 'Collect anonymous usage stats', 'innsight' ), 'innsight_analytics', 'render_checkbox', __( 'Tracks map loads, POI opens/saves, and share activity as day-bucketed aggregate counts. No visitor identity, no IP stored, no cookies. Powers the Dashboard widget + Analytics page.', 'innsight' ) );
 
         $this->add_field( 'geocoder_email', __( 'Nominatim contact email', 'innsight' ), 'innsight_geocoder', 'render_text', __( 'Sent in the User-Agent header per Nominatim usage policy.', 'innsight' ) );
         $this->add_field( 'geocoder_cache_hours', __( 'Geocoder cache TTL (hours)', 'innsight' ), 'innsight_geocoder', 'render_number' );

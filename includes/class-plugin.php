@@ -55,6 +55,10 @@ final class Plugin {
     private $defaults_page;
     /** @var CacheManager */
     private $cache_manager;
+    /** @var Stats */
+    private $stats;
+    /** @var AnalyticsPage */
+    private $analytics_page;
     /** @var bool */
     private $booted = false;
 
@@ -84,7 +88,9 @@ final class Plugin {
         $this->skin_partials   = new SkinPartials();
         $this->assets          = new Assets();
         $this->shortcode       = new Shortcode( $this->data_source, $this->json_builder, $this->skin_partials, $this->assets );
-        $this->rest_controller = new RestController( $this->data_source, $this->json_builder );
+        $this->stats           = new Stats();
+        $this->rest_controller = new RestController( $this->data_source, $this->json_builder, $this->stats );
+        $this->analytics_page  = new AnalyticsPage( $this->stats );
         $this->kml_export      = new KmlExport( $this->data_source );
         $this->admin           = new Admin();
         $this->poi_post_type   = new PoiPostType();
@@ -120,6 +126,8 @@ final class Plugin {
             'legacy_compat'   => $this->legacy_compat,
             'defaults_page'   => $this->defaults_page,
             'cache_manager'   => $this->cache_manager,
+            'stats'           => $this->stats,
+            'analytics_page'  => $this->analytics_page,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
@@ -142,6 +150,7 @@ final class Plugin {
             $this->defaults_page->register();
             $this->poi_exporter->register();
             $this->import_page->register();
+            $this->analytics_page->register();
         }
     }
 

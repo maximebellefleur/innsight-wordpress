@@ -1,4 +1,66 @@
 # Changelog
+## 0.6.0 - 2026-05-14
+
+Analytics module. Privacy-friendly aggregate usage counts + a
+Dashboard widget + a full Analytics page under Innsight menu.
+
+### Data model
+
+- **New custom table `{prefix}innsight_stats`** installed by dbDelta on
+  activation. Schema `(event_key, poi_id, day, count)` with unique key
+  `(event_key, poi_id, day)`. Every event is an atomic
+  `INSERT ... ON DUPLICATE KEY UPDATE count = count + 1` so writes are
+  O(1) under any traffic load.
+- **No visitor identity, no IP stored, no cookies.** Just anonymous
+  day-bucketed aggregate counts. Nothing that would trigger GDPR
+  analysis for the average tourism-map deployment.
+
+### Events tracked
+
+- `map_load` - sheet controller booted (one per page load).
+- `poi_open` - a POI sheet was opened.
+- `poi_save` / `poi_unsave` - visitor's local saved list changed.
+- `share_send` - Share Wishlist channel dispatched (channel stashed
+  as `ch:whatsapp`, `ch:email`, etc for a channel breakdown).
+- `share_received` - visitor landed via an #innsight_share URL.
+
+### Frontend cost
+
+- Single `navigator.sendBeacon()` call per event with fetch keepalive
+  fallback. Fire-and-forget; never blocks the pointer handler that
+  queued it. Wrapped in try/catch so a beacon failure can never
+  affect visitor UX.
+- Skin skips the beacon entirely when `cfg.ui.analyticsUrl` is empty
+  (set to empty by JsonBuilder when the admin flips off the
+  "Collect anonymous usage stats" setting).
+
+### REST endpoint
+
+- `POST /wp-json/innsight/v1/stat` accepts `{event, poi_id?}`. Public
+  (no auth) but per-IP throttled at 60 events/minute via a hashed
+  transient key so runaway loops can't flood the table.
+- Sites needing auth can hook `innsight/rest/stat_permission`.
+
+### Admin surfaces
+
+- **wp-admin Dashboard widget** "Innsight - map activity": three
+  metric tiles (loads today + this week, saves today + this week,
+  shares this week) + top 5 most-saved POIs with edit links + a
+  link to the full Analytics page.
+- **Analytics submenu page** (Innsight → Analytics): six event-total
+  tiles (last 30 days + today for each), an inline SVG polyline
+  chart of daily map loads for the last 30 days (no JS chart lib,
+  ~1KB of markup), full 50-row sortable table of most-saved POIs
+  for the last 90 days (with net = saves - unsaves), and a shares-
+  by-channel breakdown.
+
+### Settings
+
+- New **Analytics** section in Settings → Innsight with a single
+  "Collect anonymous usage stats" checkbox (default on). Off = skin
+  skips all beacon calls; nothing about analytics touches the
+  visitor's session.
+
 ## 0.5.13 - 2026-05-14
 
 - **Modal z-index stack reordered above the tab bar.** When the tab
