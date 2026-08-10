@@ -72,6 +72,130 @@ final class Places {
         add_action( self::CRON_ONE, array( $this, 'cron_refresh_one' ), 10, 2 );
         add_action( self::CRON_ALL, array( $this, 'cron_refresh_all' ) );
         add_action( 'init', array( $this, 'maybe_schedule_daily' ) );
+        add_action( 'admin_post_innsight_places_refresh', array( $this, 'handle_admin_refresh' ) );
+    }
+
+    /**
+     * Enrichment status snapshot for the Settings page. Uses the
+     * current DataSource POI list as the "expected" universe so
+     * "cached X of Y" is accurate against what visitors actually see
+     * on the map.
+     *
+     * @return array{total:int,cached:int,fresh:int,stale:int,errored:int,last_fetch:?string}
+     */
+    public function status(): array {
+        $plugin = \Innsight\Plugin::instance();
+        try {
+            $intermediate = $plugin->data_source()->build( array( 'post_id' => 0, 'viewmode' => 'multi' ) );
+        } catch ( \Throwable $e ) {
+            return array( 'total' => 0, 'cached' => 0, 'fresh' => 0, 'stale' => 0, 'errored' => 0, 'last_fetch' => null );
+        }
+        $ids = array_filter( array_map( static function ( $p ) { return isset( $p['id'] ) ? (string) $p['id'] : ''; }, (array) ( $intermediate['pois'] ?? array() ) ) );
+        $total = count( $ids );
+        if ( $total === 0 ) {
+            return array( 'total' => 0, 'cached' => 0, 'fresh' => 0, 'stale' => 0, 'errored' => 0, 'last_fetch' => null );
+        }
+
+        global $wpdb;
+        $table = self::table_name();
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%s' ) );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT poi_id, fetched_at, error, data IS NOT NULL AS has_data FROM {$table} WHERE poi_id IN ({$placeholders})",
+            ...$ids
+        ), ARRAY_A );
+
+        $now       = time();
+        $ttl       = self::TTL_DAYS * DAY_IN_SECONDS;
+        $cached    = 0;
+        $fresh     = 0;
+        $stale     = 0;
+        $errored   = 0;
+        $last_ts   = 0;
+        foreach ( $rows as $r ) {
+            $ts = strtotime( ( $r['fetched_at'] ?? '' ) . ' UTC' );
+            if ( ! empty( $r['error'] ) && empty( $r['has_data'] ) ) { $errored++; continue; }
+            $cached++;
+            if ( $ts && $now - $ts < $ttl ) $fresh++; else $stale++;
+            if ( $ts > $last_ts ) $last_ts = $ts;
+        }
+        return array(
+            'total'      => $total,
+            'cached'     => $cached,
+            'fresh'      => $fresh,
+            'stale'      => $stale,
+            'errored'    => $errored,
+            'last_fetch' => $last_ts ? gmdate( 'Y-m-d H:i:s', $last_ts ) : null,
+        );
+    }
+
+    /**
+     * Synchronously refresh the next N POIs that are missing or older
+     * than 30 days. Called from the "Refresh next 25 stale POIs" admin
+     * button. Returns the number of rows refreshed so the notice can
+     * tell the admin exactly how far they got.
+     */
+    public function refresh_batch( int $size = 25 ): int {
+        $api_key = trim( (string) innsight_settings( 'google_places_key', '' ) );
+        if ( $api_key === '' ) return 0;
+
+        $plugin = \Innsight\Plugin::instance();
+        try {
+            $intermediate = $plugin->data_source()->build( array( 'post_id' => 0, 'viewmode' => 'multi' ) );
+        } catch ( \Throwable $e ) {
+            return 0;
+        }
+        $pois = array();
+        foreach ( (array) ( $intermediate['pois'] ?? array() ) as $p ) {
+            if ( ! empty( $p['id'] ) ) $pois[ (string) $p['id'] ] = $p;
+        }
+        if ( empty( $pois ) ) return 0;
+
+        global $wpdb;
+        $table = self::table_name();
+        $ids   = array_keys( $pois );
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%s' ) );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT poi_id, fetched_at FROM {$table} WHERE poi_id IN ({$placeholders})",
+            ...$ids
+        ), ARRAY_A );
+        $cache_map = array();
+        foreach ( $rows as $r ) $cache_map[ $r['poi_id'] ] = $r['fetched_at'];
+
+        $threshold = time() - ( self::TTL_DAYS * DAY_IN_SECONDS );
+        $todo = array();
+        foreach ( $ids as $id ) {
+            $ts = isset( $cache_map[ $id ] ) ? strtotime( $cache_map[ $id ] . ' UTC' ) : 0;
+            if ( ! $ts || $ts < $threshold ) $todo[] = $id;
+            if ( count( $todo ) >= $size ) break;
+        }
+
+        $done = 0;
+        foreach ( $todo as $id ) {
+            $this->refresh( $id, $pois[ $id ] );
+            $done++;
+            usleep( 200 * 1000 );
+        }
+        return $done;
+    }
+
+    /**
+     * Admin-post handler for the "Refresh next 25 stale POIs" button
+     * in Settings. Verifies nonce + cap, runs one batch, redirects
+     * back with a query flag the admin page picks up to show a notice.
+     */
+    public function handle_admin_refresh(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Forbidden.', 'innsight' ) );
+        }
+        check_admin_referer( 'innsight_places_refresh' );
+        // 25 = same batch as the nightly cron. Long-running enough to
+        // catch progress, short enough to complete inside PHP's default
+        // max_execution_time even on modest hosts.
+        $done = $this->refresh_batch( 25 );
+        wp_safe_redirect( add_query_arg( 'innsight_places_done', (int) $done, wp_get_referer() ?: admin_url( 'admin.php?page=innsight' ) ) );
+        exit;
     }
 
     /**

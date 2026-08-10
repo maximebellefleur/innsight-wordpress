@@ -1,4 +1,16 @@
 # Changelog
+## 0.7.1 - 2026-05-14
+
+- **Google Places status card** on the Settings page: progress bar +
+  "X of Y POIs cached with fresh data (< 30 days). N stale, N
+  errored" + last-fetch timestamp + next-cron ETA.
+- **"Refresh next 25 POIs now"** button — synchronously refreshes a
+  batch of stale/missing POIs so admins don't have to wait for the
+  nightly cron or for visitors to lazy-load them. Safe to click
+  multiple times to walk through a large catalogue.
+- The card is hidden when Places enrichment is disabled or no API
+  key is configured (no clutter for sites that don't use it).
+
 ## 0.7.0 - 2026-05-14
 
 Google Places moved server-side + Google info strip on every POI sheet.

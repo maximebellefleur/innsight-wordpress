@@ -164,11 +164,88 @@ final class Admin {
         $purge_url = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_purge_caches' ), 'innsight_purge_caches' );
         echo '<div style="background:#fffbe5;border-left:4px solid #f0b849;padding:12px 14px;margin:14px 0;max-width:780px"><p style="margin:0 0 6px"><strong>' . esc_html__( 'Visitors seeing old layouts after an upgrade?', 'innsight' ) . '</strong></p><p style="margin:0 0 8px">' . esc_html__( 'Click below to flush the Innsight partial cache plus every page-cache plugin we recognise (WP Rocket, LiteSpeed, W3TC, WP Super Cache, SG Optimizer, Hummingbird, Breeze, Cache Enabler, WP Fastest Cache, WP Engine, Kinsta, Pantheon, NGINX Helper).', 'innsight' ) . '</p><a href="' . esc_url( $purge_url ) . '" class="button button-primary">' . esc_html__( 'Purge Innsight caches now', 'innsight' ) . '</a></div>';
 
+        $this->render_places_status_card();
+
         echo '<form method="post" action="options.php">';
         settings_fields( 'innsight_settings_group' );
         do_settings_sections( self::PAGE_SLUG );
         submit_button();
         echo '</form></div>';
+    }
+
+    /**
+     * Places enrichment status card. Sits above the settings form
+     * so admins can see at a glance how many POIs have Google data
+     * cached, and refresh the next 25 stale ones with one click.
+     * Hidden when Places enrichment is disabled or no API key set.
+     */
+    private function render_places_status_card(): void {
+        $settings = innsight_settings();
+        $enabled  = ! empty( $settings['google_places_enable'] ) && ! empty( $settings['google_places_key'] );
+        if ( ! $enabled ) return;
+        if ( ! class_exists( '\\Innsight\\Places' ) ) return;
+
+        // Post-refresh success notice.
+        if ( isset( $_GET['innsight_places_done'] ) ) {
+            $done = (int) $_GET['innsight_places_done'];
+            echo '<div class="notice notice-success is-dismissible"><p>'
+                . sprintf( esc_html( _n( 'Refreshed %d POI from Google Places.', 'Refreshed %d POIs from Google Places.', $done, 'innsight' ) ), $done )
+                . '</p></div>';
+        }
+
+        $places = \Innsight\Plugin::instance()->places();
+        $s      = $places->status();
+        $refresh_url = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_places_refresh' ), 'innsight_places_refresh' );
+        $cron_on   = ! empty( $settings['places_cron_enabled'] );
+        $next_cron = wp_next_scheduled( 'innsight_places_daily' );
+
+        $pct = $s['total'] > 0 ? min( 100, (int) round( 100 * $s['fresh'] / $s['total'] ) ) : 0;
+
+        echo '<div style="background:#f0f6fc;border-left:4px solid #2271b1;padding:12px 14px;margin:14px 0;max-width:780px">';
+        echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'Google Places enrichment status', 'innsight' ) . '</strong></p>';
+
+        // Progress bar.
+        echo '<div style="background:#e0e0e2;border-radius:4px;height:8px;overflow:hidden;margin:8px 0">';
+        echo '<div style="background:#2271b1;height:100%;width:' . (int) $pct . '%"></div>';
+        echo '</div>';
+
+        echo '<p style="margin:0 0 8px;font-size:13px">'
+            . sprintf(
+                /* translators: 1=fresh, 2=total, 3=stale, 4=errored */
+                esc_html__( '%1$d of %2$d POIs cached with fresh Google data (< 30 days). %3$d stale/missing, %4$d errored.', 'innsight' ),
+                (int) $s['fresh'], (int) $s['total'], (int) ( $s['stale'] + ( $s['total'] - $s['cached'] ) ), (int) $s['errored']
+            )
+            . '</p>';
+
+        if ( $s['last_fetch'] ) {
+            $last_ago = human_time_diff( strtotime( $s['last_fetch'] . ' UTC' ), time() );
+            echo '<p style="margin:0 0 8px;font-size:12px;color:#646970">'
+                . sprintf( esc_html__( 'Last successful fetch: %s ago.', 'innsight' ), esc_html( $last_ago ) )
+                . '</p>';
+        }
+        if ( $cron_on ) {
+            $next = $next_cron ? human_time_diff( time(), $next_cron ) : __( 'unscheduled', 'innsight' );
+            echo '<p style="margin:0 0 8px;font-size:12px;color:#646970">'
+                . sprintf( esc_html__( 'Nightly cron on - next run in %s (refreshes up to 25 stale POIs per night).', 'innsight' ), esc_html( $next ) )
+                . '</p>';
+        } else {
+            echo '<p style="margin:0 0 8px;font-size:12px;color:#646970">'
+                . esc_html__( 'Nightly cron off - enable in the Google Places section below to auto-refresh in the background.', 'innsight' )
+                . '</p>';
+        }
+
+        $remaining = max( 0, $s['total'] - $s['fresh'] );
+        if ( $remaining > 0 ) {
+            echo '<a href="' . esc_url( $refresh_url ) . '" class="button button-primary">'
+                . sprintf( esc_html__( 'Refresh next %d POIs now', 'innsight' ), min( 25, $remaining ) )
+                . '</a>';
+            echo ' <span style="color:#646970;font-size:12px;margin-left:6px">'
+                . esc_html__( 'Runs synchronously; safe to click multiple times.', 'innsight' )
+                . '</span>';
+        } else {
+            echo '<p style="margin:0;color:#00a32a;font-weight:600">' . esc_html__( 'All POIs fresh. Nothing to do.', 'innsight' ) . '</p>';
+        }
+        echo '</div>';
     }
 
     /* ----------------------------- field renderers ----------------------------- */
