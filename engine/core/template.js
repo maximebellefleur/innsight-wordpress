@@ -67,6 +67,39 @@
         return -1;
     }
 
+    /**
+     * Depth-aware {{else}} splitter. The simple regex-first-match version
+     * broke when a block contained a NESTED {{#if}}{{else}}{{/if}} but had
+     * no else of its own - the nested {{else}} was picked up as the outer
+     * split point and the ifBranch got truncated, leaving a broken template
+     * that emitted raw {{#if key}} text on the page.
+     *
+     * Returns [ifBranch, elseBranch]. When the body has no matching else at
+     * depth 0, elseBranch is ''.
+     */
+    function splitOnElse(body) {
+        var openRe  = /\{\{\s*(#if|#unless|#each)\s+[\w.]+\s*\}\}/;
+        var closeRe = /\{\{\s*(\/if|\/unless|\/each)\s*\}\}/;
+        var elseRe  = /\{\{\s*else\s*\}\}/;
+        var depth = 0;
+        var i = 0;
+        while (i < body.length) {
+            var openIdx = body.indexOf('{{', i);
+            if (openIdx === -1) break;
+            var rest = body.slice(openIdx);
+            var m;
+            if ((m = rest.match(openRe)) && m.index === 0)  { depth++;  i = openIdx + m[0].length; continue; }
+            if ((m = rest.match(closeRe)) && m.index === 0) { depth--;  i = openIdx + m[0].length; continue; }
+            if ((m = rest.match(elseRe)) && m.index === 0) {
+                if (depth === 0) return [body.slice(0, openIdx), body.slice(openIdx + m[0].length)];
+                i = openIdx + m[0].length;
+                continue;
+            }
+            i = openIdx + 2; // regular {{var}} - skip past the braces
+        }
+        return [body, ''];
+    }
+
     function render(template, data) {
         if (template == null) return '';
         var src = String(template);
@@ -98,13 +131,12 @@
                 } else {
                     var truthy = isTruthy(value);
                     if (tag === '#unless') truthy = !truthy;
-                    var ifBranch = body, elseBranch = '';
-                    var elseMatch = body.match(/\{\{\s*else\s*\}\}/);
-                    if (elseMatch) {
-                        ifBranch = body.slice(0, elseMatch.index);
-                        elseBranch = body.slice(elseMatch.index + elseMatch[0].length);
-                    }
-                    out += render(truthy ? ifBranch : elseBranch, ctx);
+                    // Depth-aware split so a nested {{else}} inside a
+                    // child block doesn't get mistaken for this block's
+                    // else - the classic cause of "raw {{#if key}} text
+                    // shows on the page" bugs.
+                    var parts = splitOnElse(body);
+                    out += render(truthy ? parts[0] : parts[1], ctx);
                 }
                 i = afterBlock;
                 continue;

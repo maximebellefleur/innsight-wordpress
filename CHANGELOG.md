@@ -1,4 +1,50 @@
 # Changelog
+## 0.7.5 - 2026-05-14
+
+Two real fixes chased down from your Eiger POI screenshot.
+
+### Template engine nested-else bug
+
+The screenshot showed raw `{{#if ratingLabel}}` on the sheet even
+though the Places data was clearly cached. Root cause: my
+`{{#if}}{{else}}{{/if}}` matcher was a plain regex that grabbed the
+FIRST `{{else}}` in the body - including ones belonging to nested
+child blocks. When the outer block had no else of its own but
+contained a nested `{{#if}}{{else}}{{/if}}`, the parser split at the
+nested else and left the outer if-branch truncated. Result:
+half-parsed template + raw `{{tokens}}` on screen.
+
+New `splitOnElse()` walks the body depth-aware (tracking
+`#if/#unless/#each` opens and closes) and only returns an else that
+belongs to THIS block's own scope. The Eiger sheet should now render
+the accent rating pill + hours + directions properly.
+
+### Save + More info full-width lock
+
+Regression from 0.7.4: because the template misparse (above) left
+the `.in-sheet__gstrip` div unclosed, the actions row ended up
+nested inside a flex-wrap container and the buttons collapsed to
+content width. Belt-and-braces CSS: `.in-sheet__actions` now has
+`display: flex !important; width: 100%` and `.in-sheet__act` has
+`flex: 1 1 0 !important`, so even if a future template bug or a
+theme override tries to squeeze them, the buttons stay full-width.
+
+### POI edit page Places panel
+
+New "Innsight - Google Places data" metabox on both the POI term
+edit screen (`term.php?taxonomy=point_of_interest&tag_ID=X`) AND the
+POI post edit screen (if POIs are posts). Shows:
+- Cached poi_id + Google place id
+- Fetched-at timestamp (with human-readable "N days ago")
+- Rating + review count, today's hours, full weekday schedule
+- Phone, photo thumbnail
+- Last error message if any
+- **"Refresh this POI now"** button - one click, per-POI, no need
+  to leave the edit screen or find the poi_id in a debug page.
+
+Empty-state also lists the poi_id variants we searched (raw numeric,
+`term-N`, `poi-N`) so the mismatch is visible when it happens.
+
 ## 0.7.4 - 2026-05-14
 
 Three fixes chased down from your DevTools session.

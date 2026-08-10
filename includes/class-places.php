@@ -74,7 +74,155 @@ final class Places {
         add_action( 'init', array( $this, 'maybe_schedule_daily' ) );
         add_action( 'admin_post_innsight_places_refresh', array( $this, 'handle_admin_refresh' ) );
         add_action( 'admin_post_innsight_places_test', array( $this, 'handle_admin_test' ) );
+        add_action( 'admin_post_innsight_places_refresh_one', array( $this, 'handle_admin_refresh_one' ) );
         add_action( 'admin_menu', array( $this, 'register_debug_menu' ), 40 );
+        // Per-POI panel on the term edit screen. The POI taxonomy id is
+        // known from the URL; we render the cached row + a "Refresh
+        // now" button so admins can see + prod the data one POI at a
+        // time from the edit page they were already looking at.
+        add_action( 'point_of_interest_edit_form', array( $this, 'render_term_places_box' ), 20, 2 );
+        // Same for the post-type edit screen (if POIs are posts).
+        add_action( 'add_meta_boxes', array( $this, 'register_post_metabox' ) );
+    }
+
+    public function register_post_metabox(): void {
+        foreach ( array( 'poi', 'point_of_interest' ) as $post_type ) {
+            if ( post_type_exists( $post_type ) ) {
+                add_meta_box(
+                    'innsight_places_box',
+                    __( 'Innsight - Google Places data', 'innsight' ),
+                    array( $this, 'render_post_places_box' ),
+                    $post_type,
+                    'normal',
+                    'default'
+                );
+            }
+        }
+    }
+
+    /**
+     * Term edit screen - render the cached Places row for THIS term id.
+     * Uses BOTH numeric term id and the "term-XX" prefix because
+     * DataSource emits either depending on the POI source.
+     */
+    public function render_term_places_box( $term, $taxonomy = '' ): void {
+        if ( ! $term ) return;
+        $term_id = (int) ( is_object( $term ) ? $term->term_id : $term );
+        $tried   = array( (string) $term_id, 'term-' . $term_id, 'poi-' . $term_id );
+        $row     = null;
+        $matched = '';
+        foreach ( $tried as $pid ) {
+            $r = $this->get_cached( $pid );
+            if ( $r ) { $row = $r; $matched = $pid; break; }
+        }
+        echo '<tr class="form-field"><th scope="row"><label>' . esc_html__( 'Innsight - Google Places data', 'innsight' ) . '</label></th><td>';
+        $this->print_places_panel( $row, $matched, $tried );
+        echo '</td></tr>';
+    }
+
+    public function render_post_places_box( $post ): void {
+        if ( ! $post ) return;
+        $post_id = (int) $post->ID;
+        $tried   = array( (string) $post_id, 'poi-' . $post_id, 'post-' . $post_id );
+        $row     = null;
+        $matched = '';
+        foreach ( $tried as $pid ) {
+            $r = $this->get_cached( $pid );
+            if ( $r ) { $row = $r; $matched = $pid; break; }
+        }
+        $this->print_places_panel( $row, $matched, $tried );
+    }
+
+    /**
+     * Shared HTML for both surfaces. Shows either the cached row
+     * (place_id, fetched_at, rating, hours, phone, photo) or an empty
+     * state with the poi ids we searched. Always includes a "Refresh
+     * this POI now" button that talks to admin-post.
+     */
+    private function print_places_panel( ?array $row, string $matched, array $tried ): void {
+        if ( ! $row ) {
+            echo '<div style="background:#f6f7f7;border:1px solid #dcdcde;padding:10px 12px;border-radius:4px;max-width:640px">';
+            echo '<p style="margin:0 0 4px"><strong>' . esc_html__( 'No cached Places data for this POI.', 'innsight' ) . '</strong></p>';
+            echo '<p style="margin:0 0 8px;color:#646970;font-size:12px">'
+                . sprintf( esc_html__( 'Searched for poi_id: %s. If your POI uses a different id format, the debugger at Innsight > Places debug will show the mismatch.', 'innsight' ),
+                    '<code>' . esc_html( implode( ', ', $tried ) ) . '</code>' ) // phpcs:ignore
+                . '</p>';
+            $poi_id_input = reset( $tried );
+            $refresh_url  = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_places_refresh_one&poi_id=' . rawurlencode( (string) $poi_id_input ) ), 'innsight_places_refresh_one' );
+            echo '<a href="' . esc_url( $refresh_url ) . '" class="button">' . esc_html__( 'Fetch Places data now', 'innsight' ) . '</a>';
+            echo '</div>';
+            return;
+        }
+        $data     = is_array( $row['data'] ?? null ) ? $row['data'] : array();
+        $rating   = isset( $data['rating'] ) ? (float) $data['rating'] : null;
+        $count    = isset( $data['userRatingCount'] ) ? (int) $data['userRatingCount'] : 0;
+        $hours    = (string) ( $data['todaysHours'] ?? '' );
+        $weekday  = (array) ( $data['weekdayHours'] ?? array() );
+        $phone    = (string) ( $data['phone'] ?? '' );
+        $photo    = (string) ( $data['photoUrl'] ?? '' );
+        $refresh_url = wp_nonce_url( admin_url( 'admin-post.php?action=innsight_places_refresh_one&poi_id=' . rawurlencode( $matched ) ), 'innsight_places_refresh_one' );
+
+        echo '<div style="background:#f6f7f7;border:1px solid #dcdcde;padding:12px 14px;border-radius:4px;max-width:820px">';
+        echo '<table style="width:100%"><tbody>';
+        echo '<tr><th style="text-align:left;padding:4px 8px 4px 0;width:180px">' . esc_html__( 'Cached under poi_id', 'innsight' ) . '</th><td><code>' . esc_html( $matched ) . '</code></td></tr>';
+        echo '<tr><th style="text-align:left;padding:4px 8px 4px 0">' . esc_html__( 'Google place id', 'innsight' ) . '</th><td><code style="font-size:11px">' . esc_html( (string) ( $row['place_id'] ?? '' ) ) . '</code></td></tr>';
+        echo '<tr><th style="text-align:left;padding:4px 8px 4px 0">' . esc_html__( 'Fetched at (UTC)', 'innsight' ) . '</th><td>' . esc_html( (string) ( $row['fetched_at'] ?? '' ) );
+        if ( ! empty( $row['fetched_at'] ) ) {
+            echo ' <span style="color:#646970">(' . esc_html( human_time_diff( strtotime( $row['fetched_at'] . ' UTC' ), time() ) ) . ' ago)</span>';
+        }
+        echo '</td></tr>';
+        if ( $rating !== null ) {
+            echo '<tr><th style="text-align:left;padding:4px 8px 4px 0">' . esc_html__( 'Rating', 'innsight' ) . '</th><td>★ ' . esc_html( number_format( $rating, 1 ) ) . ' (' . (int) $count . ' reviews)</td></tr>';
+        }
+        if ( $hours !== '' ) {
+            echo '<tr><th style="text-align:left;padding:4px 8px 4px 0;vertical-align:top">' . esc_html__( 'Hours today', 'innsight' ) . '</th><td>' . esc_html( $hours ) . '</td></tr>';
+        }
+        if ( ! empty( $weekday ) ) {
+            echo '<tr><th style="text-align:left;padding:4px 8px 4px 0;vertical-align:top">' . esc_html__( 'Full schedule', 'innsight' ) . '</th><td><ul style="margin:0;padding-left:16px">';
+            foreach ( $weekday as $line ) echo '<li>' . esc_html( (string) $line ) . '</li>';
+            echo '</ul></td></tr>';
+        }
+        if ( $phone !== '' ) {
+            echo '<tr><th style="text-align:left;padding:4px 8px 4px 0">' . esc_html__( 'Phone', 'innsight' ) . '</th><td>' . esc_html( $phone ) . '</td></tr>';
+        }
+        if ( $photo !== '' ) {
+            echo '<tr><th style="text-align:left;padding:4px 8px 4px 0;vertical-align:top">' . esc_html__( 'Photo', 'innsight' ) . '</th><td><img src="' . esc_url( $photo ) . '" alt="" style="max-width:200px;max-height:120px;border-radius:4px"></td></tr>';
+        }
+        if ( ! empty( $row['error'] ) ) {
+            echo '<tr><th style="text-align:left;padding:4px 8px 4px 0">' . esc_html__( 'Last error', 'innsight' ) . '</th><td><code style="color:#d63638">' . esc_html( (string) $row['error'] ) . '</code></td></tr>';
+        }
+        echo '</tbody></table>';
+        echo '<p style="margin:10px 0 0"><a href="' . esc_url( $refresh_url ) . '" class="button">' . esc_html__( 'Refresh this POI now', 'innsight' ) . '</a></p>';
+        echo '</div>';
+    }
+
+    /**
+     * Admin-post handler for the per-POI "Refresh this POI now" button.
+     * Loads the POI from DataSource by id, calls refresh(), redirects
+     * back to the referring edit page.
+     */
+    public function handle_admin_refresh_one(): void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'Forbidden.', 'innsight' ) );
+        check_admin_referer( 'innsight_places_refresh_one' );
+        $poi_id = isset( $_GET['poi_id'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['poi_id'] ) ) : '';
+        if ( $poi_id === '' ) wp_die( esc_html__( 'Missing poi_id.', 'innsight' ) );
+
+        $poi = null;
+        try {
+            $intermediate = \Innsight\Plugin::instance()->data_source()->build( array( 'post_id' => 0, 'viewmode' => 'multi' ) );
+            foreach ( (array) ( $intermediate['pois'] ?? array() ) as $p ) {
+                if ( ! empty( $p['id'] ) && (string) $p['id'] === $poi_id ) { $poi = $p; break; }
+            }
+        } catch ( \Throwable $e ) {}
+
+        if ( ! $poi ) {
+            // Fall back to minimal shape from just the id so we can at least
+            // attempt a name-based search.
+            $poi = array( 'id' => $poi_id, 'title' => $poi_id, 'lat' => 0, 'lon' => 0 );
+        }
+        $this->refresh( $poi_id, $poi );
+        wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=innsight-places-debug' ) );
+        exit;
     }
 
     /**

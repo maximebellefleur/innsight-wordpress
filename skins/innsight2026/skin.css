@@ -694,9 +694,19 @@
     to   { transform: translateY(0);   opacity: 1; }
 }
 
-/* Sheet actions */
+/* Sheet actions - Save + More info / custom primary. Full-width by
+ * design (each button takes an equal half of the sheet), locked with
+ * !important so a template misparse or a theme override can never
+ * collapse them back to content width like the 0.7.4 regression did. */
 .in-sheet__actions {
-    display: flex; gap: 10px;
+    display: flex !important;
+    gap: 10px;
+    width: 100%;
+    margin-top: 4px;
+}
+.in-sheet__act {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
 }
 .in-sheet__act {
     flex: 1;
