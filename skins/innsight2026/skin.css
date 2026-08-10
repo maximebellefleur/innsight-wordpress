@@ -1367,33 +1367,19 @@ body.innsight-sheet-locked {
 .in-sheet__gdir:hover { color: var(--in-ink) !important; }
 .in-sheet__gdir svg { transform: rotate(-45deg); }
 
-/* Loading state: blur + a bumping pulse on the whole strip while the
- * server refreshes the cache in the background. Applied via
- * data-enrich="true" that buildSheetContext sets from enrichPending.
- * Skeleton variant when there's no cached data at all so the visitor
- * still sees where the info will appear. */
-.in-sheet__gstrip[data-enrich="true"] {
-    filter: blur(1.2px);
-    animation: in-gstrip-bump 1.8s ease-in-out infinite;
+/* Per-item pending state. Individual gitems get --pending when the
+ * server hasn't returned data for them yet. Blur + pulse just that
+ * pill so the visitor sees WHICH pieces are loading. Rating and
+ * hours pulse independently; the directions link (built from POI
+ * lat/lon) never pulses because it's always accurate. */
+.in-sheet__gitem--pending {
+    background: rgba(15,15,15,0.06) !important;
+    color: var(--in-mute) !important;
+    border-color: transparent !important;
+    filter: blur(1px);
+    animation: in-gstrip-bump 1.6s ease-in-out infinite;
 }
-.in-sheet__gstrip--skeleton {
-    opacity: 0.9;
-    animation: in-gstrip-bump 1.8s ease-in-out infinite;
-}
-.in-sheet__gitem--skel {
-    display: inline-block;
-    height: 20px;
-    width: 60px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, rgba(15,15,15,0.08) 25%, rgba(15,15,15,0.14) 50%, rgba(15,15,15,0.08) 75%);
-    background-size: 200% 100%;
-    animation: in-shimmer 1.4s linear infinite;
-}
-.in-sheet__gitem--skel-wide { width: 180px; }
-@keyframes in-gstrip-bump {
-    0%, 100% { transform: translateY(0);     opacity: 1; }
-    50%      { transform: translateY(-2px);  opacity: 0.75; }
-}
+.in-sheet__gitem--pending:hover { transform: none !important; }
 @keyframes in-gsched-pop {
     from { opacity: 0; transform: translateY(-4px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -1403,9 +1389,11 @@ body.innsight-sheet-locked {
     100% { background-position: -200% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .in-sheet__gstrip[data-enrich="true"],
-    .in-sheet__gstrip--skeleton { animation: none !important; filter: none !important; }
-    .in-sheet__gitem--skel { animation: none !important; }
+    .in-sheet__gitem--pending { animation: none !important; filter: none !important; }
+}
+@keyframes in-gstrip-bump {
+    0%, 100% { transform: translateY(0);     opacity: 1; }
+    50%      { transform: translateY(-2px);  opacity: 0.65; }
 }
 
 /* ── v0.5.0 - Personal note pull-up ──────────────────────────────────────── */

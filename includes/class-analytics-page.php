@@ -207,6 +207,44 @@ final class AnalyticsPage {
         }
 
         echo '<p style="color:#646970;font-size:12px;margin-top:26px">' . esc_html__( 'Counts are aggregated anonymously - no visitor identity, no IP, no cookies. Analytics can be turned off at any time in Settings → Innsight.', 'innsight' ) . '</p>';
+
+        // ─ Raw-table debugger. Bypasses every aggregate reader so if
+        //   the widgets above show 0 but the table has rows, you'll see
+        //   it here.
+        global $wpdb;
+        $table = \Innsight\Stats::table_name();
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $total_rows = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $total_events = (int) $wpdb->get_var( "SELECT COALESCE(SUM(count), 0) FROM {$table}" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $recent = $wpdb->get_results( "SELECT event_key, poi_id, day, count FROM {$table} ORDER BY day DESC, count DESC LIMIT 20", ARRAY_A );
+
+        echo '<details style="margin-top:26px">';
+        echo '<summary style="cursor:pointer;font-weight:600">' . esc_html__( 'Raw table debugger', 'innsight' ) . '</summary>';
+        echo '<div style="background:#f6f7f7;border:1px solid #dcdcde;padding:12px;border-radius:6px;margin-top:8px;max-width:820px">';
+        echo '<p style="margin:0 0 8px"><strong>' . esc_html( $table ) . '</strong></p>';
+        echo '<p style="margin:0 0 8px">' . sprintf( esc_html__( 'Rows: %1$d - Total counted events: %2$d', 'innsight' ), $total_rows, $total_events ) . '</p>';
+        if ( $wpdb->last_error !== '' ) {
+            echo '<p style="color:#d63638"><strong>wpdb last_error:</strong> <code>' . esc_html( $wpdb->last_error ) . '</code></p>';
+        }
+        if ( $total_rows === 0 ) {
+            echo '<p style="color:#d63638"><strong>' . esc_html__( 'Table is empty.', 'innsight' ) . '</strong> ' . esc_html__( 'Beacons are not landing. Check browser DevTools > Network for POST calls to /wp-json/innsight/v1/stat when opening a POI.', 'innsight' ) . '</p>';
+        } else {
+            echo '<table class="widefat striped"><thead><tr><th>event</th><th>poi_id</th><th>day</th><th>count</th></tr></thead><tbody>';
+            foreach ( $recent as $r ) {
+                echo '<tr>';
+                echo '<td><code>' . esc_html( (string) $r['event_key'] ) . '</code></td>';
+                echo '<td>' . ( $r['poi_id'] !== '' ? '<code>' . esc_html( (string) $r['poi_id'] ) . '</code>' : '—' ) . '</td>';
+                echo '<td>' . esc_html( (string) $r['day'] ) . '</td>';
+                echo '<td style="text-align:right;font-variant-numeric:tabular-nums">' . (int) $r['count'] . '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+        }
+        echo '<p style="margin:12px 0 0;font-size:12px;color:#646970">' . esc_html__( 'Beacon endpoint:', 'innsight' ) . ' <code>' . esc_html( rest_url( 'innsight/v1/stat' ) ) . '</code></p>';
+        echo '</div></details>';
+
         echo '</div>';
     }
 

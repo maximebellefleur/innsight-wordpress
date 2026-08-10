@@ -108,6 +108,93 @@ final class Places {
         echo '<div class="wrap"><h1>' . esc_html__( 'Innsight - Places debug', 'innsight' ) . '</h1>';
 
         // Key + enable status.
+        // ─ Raw table stats - bypass status() entirely ─
+        global $wpdb;
+        $table = self::table_name();
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $row_count      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $with_data      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE data IS NOT NULL AND data <> ''" );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $with_error     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE error IS NOT NULL AND error <> ''" );
+        $fresh_cutoff   = gmdate( 'Y-m-d H:i:s', time() - self::TTL_DAYS * DAY_IN_SECONDS );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL
+        $fresh_count    = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE data IS NOT NULL AND data <> '' AND fetched_at >= %s", $fresh_cutoff ) );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $last_wpdb_err  = $wpdb->last_error;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $recent_rows    = $wpdb->get_results( "SELECT poi_id, place_id, fetched_at, error, CHAR_LENGTH(COALESCE(data,'')) AS data_bytes FROM {$table} ORDER BY fetched_at DESC LIMIT 10", ARRAY_A );
+
+        echo '<h2>' . esc_html__( 'Raw table stats (bypasses status())', 'innsight' ) . '</h2>';
+        echo '<table class="widefat striped" style="max-width:640px">';
+        echo '<tbody>';
+        echo '<tr><th style="width:40%">Table</th><td><code>' . esc_html( $table ) . '</code></td></tr>';
+        echo '<tr><th>Total rows</th><td><strong>' . (int) $row_count . '</strong></td></tr>';
+        echo '<tr><th>Rows with data (blob)</th><td><strong>' . (int) $with_data . '</strong></td></tr>';
+        echo '<tr><th>Rows with error text</th><td><strong>' . (int) $with_error . '</strong></td></tr>';
+        echo '<tr><th>Fresh rows (data + < 30d)</th><td><strong>' . (int) $fresh_count . '</strong></td></tr>';
+        echo '<tr><th>Fresh cutoff (UTC)</th><td><code>' . esc_html( $fresh_cutoff ) . '</code></td></tr>';
+        echo '<tr><th>Last wpdb error</th><td>' . ( $last_wpdb_err !== '' ? '<code style="color:#d63638">' . esc_html( $last_wpdb_err ) . '</code>' : '—' ) . '</td></tr>';
+        echo '</tbody></table>';
+
+        echo '<h3 style="margin-top:14px">' . esc_html__( 'Last 10 rows (newest first)', 'innsight' ) . '</h3>';
+        if ( empty( $recent_rows ) ) {
+            echo '<p style="color:#d63638"><strong>' . esc_html__( 'Table is empty. If Refresh reports "25 succeeded" but this table stays empty, writes are silently failing (check the last wpdb error above, and PHP error log).', 'innsight' ) . '</strong></p>';
+        } else {
+            echo '<table class="widefat striped" style="max-width:820px">';
+            echo '<thead><tr><th>poi_id</th><th>place_id</th><th>fetched_at (UTC)</th><th>data bytes</th><th>error</th></tr></thead><tbody>';
+            foreach ( $recent_rows as $r ) {
+                echo '<tr>';
+                echo '<td><code>' . esc_html( $r['poi_id'] ) . '</code></td>';
+                echo '<td><code style="font-size:11px">' . esc_html( $r['place_id'] ?: '—' ) . '</code></td>';
+                echo '<td>' . esc_html( $r['fetched_at'] ?: '—' ) . '</td>';
+                echo '<td style="font-variant-numeric:tabular-nums">' . (int) $r['data_bytes'] . '</td>';
+                echo '<td>' . ( $r['error'] ? '<code style="color:#d63638">' . esc_html( $r['error'] ) . '</code>' : '—' ) . '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+        }
+
+        // ─ POI ID sanity check ─
+        // If DataSource IDs don't match the poi_id column, status() returns 0
+        // because its IN () query never matches. Show side-by-side.
+        try {
+            $intermediate = \Innsight\Plugin::instance()->data_source()->build( array( 'post_id' => 0, 'viewmode' => 'multi' ) );
+            $ds_ids = array_slice( array_filter( array_map( static function ( $p ) { return isset( $p['id'] ) ? (string) $p['id'] : ''; }, (array) ( $intermediate['pois'] ?? array() ) ) ), 0, 10 );
+        } catch ( \Throwable $e ) {
+            $ds_ids = array( 'ERROR: ' . $e->getMessage() );
+        }
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $cache_ids = $wpdb->get_col( "SELECT poi_id FROM {$table} ORDER BY fetched_at DESC LIMIT 10" );
+
+        echo '<h3 style="margin-top:14px">' . esc_html__( 'POI id comparison (first 10 of each)', 'innsight' ) . '</h3>';
+        echo '<p style="color:#646970;font-size:12px">' . esc_html__( 'If these two columns do not overlap, status() will always report 0 fresh - the DataSource is emitting different ids than what refresh() writes.', 'innsight' ) . '</p>';
+        echo '<table class="widefat striped" style="max-width:820px">';
+        echo '<thead><tr><th>DataSource poi ids</th><th>Cached poi ids</th></tr></thead><tbody>';
+        $max = max( count( $ds_ids ), count( $cache_ids ), 1 );
+        for ( $i = 0; $i < $max; $i++ ) {
+            $ds = $ds_ids[ $i ] ?? '—';
+            $ch = $cache_ids[ $i ] ?? '—';
+            $match = in_array( $ch, $ds_ids, true ) || in_array( $ds, (array) $cache_ids, true );
+            echo '<tr>';
+            echo '<td><code>' . esc_html( $ds ) . '</code></td>';
+            echo '<td><code>' . esc_html( $ch ) . '</code></td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+
+        // Overlap summary.
+        $overlap = count( array_intersect( $ds_ids, (array) $cache_ids ) );
+        if ( $cache_ids && $overlap === 0 ) {
+            echo '<p style="color:#d63638;font-weight:600;margin-top:8px">'
+                . esc_html__( 'NO OVERLAP between DataSource ids and cached ids. This is the bug: refresh() writes with the id refresh_batch() gives it, and status() queries with DataSource ids - they should be identical but they are not.', 'innsight' )
+                . '</p>';
+        } elseif ( $cache_ids ) {
+            echo '<p style="color:#646970;margin-top:8px;font-size:12px">'
+                . sprintf( esc_html__( 'Overlap: %d of %d cached ids appear in the DataSource first-10.', 'innsight' ), (int) $overlap, count( $cache_ids ) )
+                . '</p>';
+        }
+
         echo '<h2>' . esc_html__( 'Current configuration', 'innsight' ) . '</h2>';
         echo '<ul style="margin-left:20px;list-style:disc">';
         echo '<li>' . esc_html__( 'Enrichment enabled', 'innsight' ) . ': <strong>' . ( $enabled ? esc_html__( 'YES', 'innsight' ) : esc_html__( 'NO', 'innsight' ) ) . '</strong></li>';

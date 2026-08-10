@@ -173,23 +173,28 @@
      * Silently no-ops when analytics are disabled or the endpoint URL
      * isn't in the config. Never throws - a beacon failure must never
      * affect the visitor's UX.
+     *
+     * Uses URLSearchParams (form-encoded) NOT JSON. `sendBeacon` with
+     * an `application/json` body triggers a CORS preflight, which
+     * `sendBeacon` can't perform, so the request silently drops. Form-
+     * encoded is a "simple request" - no preflight, works everywhere.
+     * WP REST parses form-encoded bodies into $request params natively.
      */
     SkinController.prototype.beacon = function (event, poiId) {
         try {
             var url = this.cfg && this.cfg.ui && this.cfg.ui.analyticsUrl;
             if (!url || !event) return;
-            var body = JSON.stringify({ event: event, poi_id: poiId || '' });
+            var form = new root.URLSearchParams();
+            form.set('event', event);
+            if (poiId) form.set('poi_id', String(poiId));
             if (root.navigator && root.navigator.sendBeacon) {
-                // Blob type kept as application/json so WP REST parses
-                // the body into params via json request-body handler.
-                var blob = new Blob([body], { type: 'application/json' });
-                root.navigator.sendBeacon(url, blob);
+                root.navigator.sendBeacon(url, form);
                 return;
             }
             root.fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: body,
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: form.toString(),
                 keepalive: true,
                 credentials: 'omit'
             }).catch(function () {});
@@ -1146,10 +1151,15 @@
         ctx.weekdayHours = Array.isArray(poi.weekdayHours)
             ? poi.weekdayHours.map(function (h) { return { value: h }; })
             : [];
-        ctx.hasGoogleStrip = !!(ctx.rating || ctx.hours || ctx.directionsUri);
-        // Enrichment expected but data not landed yet - the CSS uses
-        // this class on the sheet inner to blur + pulse the strip so
-        // the visitor knows something's coming.
+        // `enrichExpected` = Places is configured on the server, so we
+        // WILL eventually get rating + hours. Renders placeholder pills
+        // that pulse until real data lands. Independent of whether
+        // the fetch is currently in flight.
+        ctx.enrichExpected = !!(this.cfg.ui && this.cfg.ui.placesUrl);
+        // Strip is visible whenever we have anything to show OR anything
+        // to eventually show (placeholder mode).
+        ctx.hasGoogleStrip = !!(ctx.rating || ctx.hours || ctx.directionsUri || ctx.enrichExpected);
+        // Kept for backward compat with the previous CSS-driven pulse.
         ctx.enrichPending = ctx.enrichLoading;
         // Stash for navigation.
         this.sheet.siblings = siblings;

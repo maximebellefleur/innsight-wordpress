@@ -32,16 +32,28 @@
 <h2 class="in-sheet__title">{{title}}</h2>
 
 {{#if hasGoogleStrip}}
-<div class="in-sheet__gstrip" data-enrich="{{enrichPending}}">
+<div class="in-sheet__gstrip">
     <div class="in-sheet__gstrip-row">
-        {{#if ratingLabel}}<a class="in-sheet__gitem in-sheet__gitem--rating" href="{{reviewsUri}}" target="_blank" rel="noopener" aria-label="See top Google reviews">
-            <span aria-hidden="true">★</span> {{ratingLabel}}
-        </a>{{/if}}
-        {{#if hours}}<span class="in-sheet__gitem in-sheet__gitem--hours">
-            <span class="in-sheet__gopen" data-open="{{open}}">{{openLabel}}</span>
-            · {{hours}}
-            {{#if weekdayHours}}<button type="button" class="in-sheet__gsched-toggle" data-innsight-sched-toggle aria-expanded="false">see all</button>{{/if}}
-        </span>{{/if}}
+        {{#if ratingLabel}}
+            <a class="in-sheet__gitem in-sheet__gitem--rating" href="{{reviewsUri}}" target="_blank" rel="noopener" aria-label="See top Google reviews">
+                <span aria-hidden="true">★</span> {{ratingLabel}}
+            </a>
+        {{else}}
+            {{#if enrichExpected}}<span class="in-sheet__gitem in-sheet__gitem--rating in-sheet__gitem--pending" aria-hidden="true">
+                <span>★</span> —
+            </span>{{/if}}
+        {{/if}}
+        {{#if hours}}
+            <span class="in-sheet__gitem in-sheet__gitem--hours">
+                <span class="in-sheet__gopen" data-open="{{open}}">{{openLabel}}</span>
+                · {{hours}}
+                {{#if weekdayHours}}<button type="button" class="in-sheet__gsched-toggle" data-innsight-sched-toggle aria-expanded="false">see all</button>{{/if}}
+            </span>
+        {{else}}
+            {{#if enrichExpected}}<span class="in-sheet__gitem in-sheet__gitem--hours in-sheet__gitem--pending" aria-hidden="true">
+                Fetching today&rsquo;s hours…
+            </span>{{/if}}
+        {{/if}}
     </div>
     {{#if weekdayHours}}
     <ul class="in-sheet__gsched" data-innsight-sched hidden>
@@ -54,14 +66,6 @@
     </a>{{/if}}
 </div>
 {{/if}}
-{{#if enrichPending}}{{#unless hasGoogleStrip}}
-<div class="in-sheet__gstrip in-sheet__gstrip--skeleton" aria-hidden="true">
-    <div class="in-sheet__gstrip-row">
-        <span class="in-sheet__gitem in-sheet__gitem--skel"></span>
-        <span class="in-sheet__gitem in-sheet__gitem--skel in-sheet__gitem--skel-wide"></span>
-    </div>
-</div>
-{{/unless}}{{/if}}
 
 {{#if blurb}}<div class="in-sheet__blurb">{{{blurb}}}</div>{{/if}}
 

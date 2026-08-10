@@ -1,4 +1,42 @@
 # Changelog
+## 0.7.4 - 2026-05-14
+
+Three fixes chased down from your DevTools session.
+
+### Analytics beacon fix - stats were silently dropped
+
+`navigator.sendBeacon()` with an `application/json` Blob triggers a
+CORS preflight, but `sendBeacon` can't perform preflights - so the
+request silently drops. Every beacon since 0.6.0 was going nowhere.
+Beacon now sends `URLSearchParams` (form-encoded, "simple request",
+no preflight) which WP REST parses natively. Analytics widgets +
+Analytics page should start climbing on the next page load.
+
+### Always-visible Google info strip with pending pills
+
+The strip used to only render fields that had data. It now ALWAYS
+renders when Places is configured for the site (`ui.placesUrl`
+non-empty), with per-item placeholder pills that pulse + blur until
+the real data lands:
+- Rating pill shows `★ —` blurred until Places returns.
+- Hours span shows "Fetching today's hours…" blurred until Places
+  returns.
+- Directions link is always accurate (built from POI lat/lon).
+
+### Raw-table debuggers
+
+Added table-level diagnostics that bypass every aggregate reader:
+
+- **Places debug page**: total row count, rows with data, rows with
+  error, fresh count via a direct COUNT query, last wpdb error, last
+  10 rows (poi_id, place_id, fetched_at, byte length, error), plus a
+  **POI id comparison** table (DataSource ids vs cached ids). If the
+  ids don't overlap, the "Refresh reports 25 succeeded but status
+  shows 0" bug is the ID mismatch - now visible instead of hidden.
+- **Analytics page "Raw table debugger"** (collapsible): row count,
+  total events summed, last wpdb error, last 20 rows. If the table
+  has data but the widgets show 0, we can see it here.
+
 ## 0.7.3 - 2026-05-14
 
 - **New standalone "Places debug" submenu** (Innsight → Places debug).
