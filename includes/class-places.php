@@ -74,6 +74,154 @@ final class Places {
         add_action( 'init', array( $this, 'maybe_schedule_daily' ) );
         add_action( 'admin_post_innsight_places_refresh', array( $this, 'handle_admin_refresh' ) );
         add_action( 'admin_post_innsight_places_test', array( $this, 'handle_admin_test' ) );
+        add_action( 'admin_menu', array( $this, 'register_debug_menu' ), 40 );
+    }
+
+    /**
+     * Standalone debug page under Innsight -> Places debug. Shows the
+     * RAW HTTP response from Google - no fancy formatting, no
+     * translation, no transient dance. Bypasses every layer of the
+     * admin UI so if the previous status card was lying, this page
+     * shows the truth: exact URL, exact headers sent, exact bytes
+     * received.
+     */
+    public function register_debug_menu(): void {
+        add_submenu_page(
+            'innsight',
+            __( 'Places debug', 'innsight' ),
+            __( 'Places debug', 'innsight' ),
+            'manage_options',
+            'innsight-places-debug',
+            array( $this, 'render_debug_page' )
+        );
+    }
+
+    public function render_debug_page(): void {
+        if ( ! current_user_can( 'manage_options' ) ) return;
+
+        $api_key   = trim( (string) innsight_settings( 'google_places_key', '' ) );
+        $enabled   = ! empty( innsight_settings( 'google_places_enable', 0 ) );
+        $query     = isset( $_POST['q'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['q'] ) ) : 'Eiffel Tower Paris';
+        $poi_id    = isset( $_POST['poi_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['poi_id'] ) ) : '';
+        $running   = isset( $_POST['run'] ) && check_admin_referer( 'innsight_places_debug' );
+
+        echo '<div class="wrap"><h1>' . esc_html__( 'Innsight - Places debug', 'innsight' ) . '</h1>';
+
+        // Key + enable status.
+        echo '<h2>' . esc_html__( 'Current configuration', 'innsight' ) . '</h2>';
+        echo '<ul style="margin-left:20px;list-style:disc">';
+        echo '<li>' . esc_html__( 'Enrichment enabled', 'innsight' ) . ': <strong>' . ( $enabled ? esc_html__( 'YES', 'innsight' ) : esc_html__( 'NO', 'innsight' ) ) . '</strong></li>';
+        echo '<li>' . esc_html__( 'API key present', 'innsight' ) . ': <strong>' . ( $api_key !== '' ? esc_html__( 'YES', 'innsight' ) : esc_html__( 'NO', 'innsight' ) ) . '</strong>';
+        if ( $api_key !== '' ) {
+            $masked = strlen( $api_key ) > 12
+                ? substr( $api_key, 0, 4 ) . str_repeat( '·', 6 ) . substr( $api_key, -4 )
+                : str_repeat( '·', strlen( $api_key ) );
+            echo ' <code>' . esc_html( $masked ) . '</code>';
+            echo ' <span style="color:#646970">(length ' . (int) strlen( $api_key ) . ')</span>';
+        }
+        echo '</li>';
+        echo '<li>' . esc_html__( 'Nightly cron on', 'innsight' ) . ': <strong>' . ( ! empty( innsight_settings( 'places_cron_enabled', 0 ) ) ? 'YES' : 'NO' ) . '</strong></li>';
+        echo '<li>' . esc_html__( 'REST endpoint', 'innsight' ) . ': <code>' . esc_html( rest_url( 'innsight/v1/places' ) ) . '</code></li>';
+        echo '</ul>';
+
+        // Curl command the admin can paste in a terminal.
+        echo '<h2>' . esc_html__( 'Bypass everything - run this curl from your server', 'innsight' ) . '</h2>';
+        echo '<pre style="background:#1e1e1e;color:#dcdcdc;padding:12px 16px;overflow-x:auto;border-radius:4px;font-size:12px">'
+            . "curl -X POST 'https://places.googleapis.com/v1/places:searchText' \\\n"
+            . "  -H 'Content-Type: application/json' \\\n"
+            . "  -H 'X-Goog-Api-Key: " . esc_html( $api_key ?: 'YOUR_KEY' ) . "' \\\n"
+            . "  -H 'X-Goog-FieldMask: places.id,places.displayName' \\\n"
+            . "  -d '{\"textQuery\":\"" . esc_html( $query ) . "\",\"maxResultCount\":1}'"
+            . '</pre>';
+
+        // Test form.
+        echo '<h2>' . esc_html__( 'Run test from inside WordPress', 'innsight' ) . '</h2>';
+        echo '<p>' . esc_html__( 'Same HTTP call as above, made from your server via wp_remote_post(). Full raw response printed below.', 'innsight' ) . '</p>';
+        echo '<form method="post" style="display:flex;gap:10px;align-items:flex-end;max-width:820px;flex-wrap:wrap">';
+        wp_nonce_field( 'innsight_places_debug' );
+        echo '<label style="flex:1 1 320px"><span style="display:block;font-weight:600;margin-bottom:4px">' . esc_html__( 'Text query', 'innsight' ) . '</span>';
+        echo '<input type="text" name="q" value="' . esc_attr( $query ) . '" class="regular-text" style="width:100%"></label>';
+        echo '<label style="flex:1 1 320px"><span style="display:block;font-weight:600;margin-bottom:4px">' . esc_html__( 'Or refresh a specific POI id', 'innsight' ) . '</span>';
+        echo '<input type="text" name="poi_id" value="' . esc_attr( $poi_id ) . '" placeholder="e.g. act-123" class="regular-text" style="width:100%"></label>';
+        echo '<button type="submit" name="run" value="1" class="button button-primary">' . esc_html__( 'Run test', 'innsight' ) . '</button>';
+        echo '</form>';
+
+        if ( ! $running ) { echo '</div>'; return; }
+
+        // ─ Actually run the tests ─
+        echo '<h2>' . esc_html__( 'Result', 'innsight' ) . '</h2>';
+        if ( $api_key === '' ) {
+            echo '<div class="notice notice-error"><p>' . esc_html__( 'No API key configured. Save one in Settings first.', 'innsight' ) . '</p></div>';
+            echo '</div>'; return;
+        }
+
+        // Raw Places search.
+        $started = microtime( true );
+        $res = wp_remote_post( 'https://places.googleapis.com/v1/places:searchText', array(
+            'timeout' => 10,
+            'headers' => array(
+                'Content-Type'     => 'application/json',
+                'X-Goog-Api-Key'   => $api_key,
+                'X-Goog-FieldMask' => 'places.id,places.displayName,places.rating,places.userRatingCount',
+            ),
+            'body'    => wp_json_encode( array( 'textQuery' => $query, 'maxResultCount' => 3 ) ),
+        ) );
+        $elapsed = round( ( microtime( true ) - $started ) * 1000 );
+
+        if ( is_wp_error( $res ) ) {
+            echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'WP_Error', 'innsight' ) . ':</strong> ' . esc_html( $res->get_error_message() ) . '</p></div>';
+        } else {
+            $code = (int) wp_remote_retrieve_response_code( $res );
+            $body = (string) wp_remote_retrieve_body( $res );
+            $lvl  = $code === 200 ? 'success' : 'error';
+            echo '<div class="notice notice-' . esc_attr( $lvl ) . '"><p>';
+            echo '<strong>HTTP ' . (int) $code . '</strong> - '
+                . sprintf( esc_html__( 'response in %dms.', 'innsight' ), $elapsed );
+            echo '</p></div>';
+            echo '<h3>' . esc_html__( 'Response headers', 'innsight' ) . '</h3>';
+            $headers = wp_remote_retrieve_headers( $res );
+            echo '<pre style="background:#f6f7f7;padding:10px;border:1px solid #dcdcde;overflow-x:auto;font-size:12px">';
+            foreach ( (array) ( is_object( $headers ) && method_exists( $headers, 'getAll' ) ? $headers->getAll() : (array) $headers ) as $k => $v ) {
+                echo esc_html( $k . ': ' . ( is_array( $v ) ? implode( ', ', $v ) : (string) $v ) ) . "\n";
+            }
+            echo '</pre>';
+            echo '<h3>' . esc_html__( 'Response body', 'innsight' ) . '</h3>';
+            $pretty = json_encode( json_decode( $body, true ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+            echo '<pre style="background:#f6f7f7;padding:10px;border:1px solid #dcdcde;overflow-x:auto;font-size:12px;max-height:400px">'
+                . esc_html( $pretty !== false ? $pretty : $body )
+                . '</pre>';
+        }
+
+        // POI refresh test.
+        if ( $poi_id !== '' ) {
+            echo '<h3>' . esc_html__( 'POI refresh test', 'innsight' ) . '</h3>';
+            $plugin = \Innsight\Plugin::instance();
+            try {
+                $intermediate = $plugin->data_source()->build( array( 'post_id' => 0, 'viewmode' => 'multi' ) );
+            } catch ( \Throwable $e ) {
+                echo '<div class="notice notice-error"><p>' . esc_html( $e->getMessage() ) . '</p></div>';
+                echo '</div>'; return;
+            }
+            $found = null;
+            foreach ( (array) ( $intermediate['pois'] ?? array() ) as $p ) {
+                if ( ! empty( $p['id'] ) && (string) $p['id'] === $poi_id ) { $found = $p; break; }
+            }
+            if ( ! $found ) {
+                echo '<div class="notice notice-warning"><p>' . sprintf( esc_html__( 'POI id "%s" not found in current DataSource output. Check the id.', 'innsight' ), esc_html( $poi_id ) ) . '</p></div>';
+            } else {
+                echo '<pre style="background:#f6f7f7;padding:10px;border:1px solid #dcdcde;overflow-x:auto;font-size:12px">'
+                    . 'POI: ' . esc_html( wp_json_encode( array( 'id' => $found['id'], 'title' => $found['title'] ?? '', 'lat' => $found['lat'] ?? '', 'lon' => $found['lon'] ?? '', 'googlePlaceId' => $found['googlePlaceId'] ?? '' ), JSON_UNESCAPED_UNICODE ) )
+                    . '</pre>';
+                $status = $this->refresh( $poi_id, $found );
+                echo '<p>' . esc_html__( 'refresh() status', 'innsight' ) . ': <strong>' . esc_html( $status ) . '</strong></p>';
+                $row = $this->get_cached( $poi_id );
+                echo '<pre style="background:#f6f7f7;padding:10px;border:1px solid #dcdcde;overflow-x:auto;font-size:12px;max-height:400px">'
+                    . esc_html( wp_json_encode( $row, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) )
+                    . '</pre>';
+            }
+        }
+
+        echo '</div>';
     }
 
     /**

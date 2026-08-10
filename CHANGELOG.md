@@ -1,4 +1,19 @@
 # Changelog
+## 0.7.3 - 2026-05-14
+
+- **New standalone "Places debug" submenu** (Innsight → Places debug).
+  No status card, no transients, no redirect dance. Shows:
+  - Current config (enrichment on/off, API key present + masked +
+    length, cron on/off, REST endpoint URL).
+  - **The exact curl command** to run from the server terminal to
+    bypass WordPress entirely.
+  - An in-form text-query test that runs `wp_remote_post` against
+    Google Places and prints the RAW response - HTTP code,
+    headers, pretty-printed JSON body, elapsed ms.
+  - Per-POI refresh test: enter a POI id, see the DataSource
+    input, the refresh() return status, and the full cached row
+    (data or error).
+
 ## 0.7.2 - 2026-05-14
 
 Places debugger. The refresh button used to lie ("25 done") even when
