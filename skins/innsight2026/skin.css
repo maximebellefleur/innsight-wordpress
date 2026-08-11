@@ -1309,10 +1309,20 @@ body.innsight-sheet-locked {
     align-items: center;
     gap: 4px 12px;
 }
-.in-sheet__gsecondary {
+/* Secondary row - price · phone · address all sit inline on ONE row,
+ * chip-like. Address text truncates with ellipsis when it's too long
+ * for the remaining space so the row never wraps into a full-width
+ * "Get directions" block like the pre-0.7.8 layout. */
+.in-sheet__gsecondary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
     margin-top: 4px;
     font-size: 12.5px;
+    color: var(--in-mute3);
 }
+.in-sheet__gsecondary-row:empty { display: none; }
 .in-sheet__gitem {
     display: inline-flex;
     align-items: center;
@@ -1471,42 +1481,23 @@ body.innsight-sheet-locked {
 .in-sheet__gitem--phone { color: var(--in-ink) !important; text-decoration: none !important; }
 .in-sheet__gitem--phone:hover { text-decoration: underline var(--in-accent) 2px !important; text-underline-offset: 2px; }
 
-/* Address line: full address text + trailing "Directions →" CTA. The
- * whole row is clickable - opens Google Maps directions. Replaces the
- * old plain "Directions" link with the weird arrow icon. */
-.in-sheet__gaddress {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 6px;
-    padding: 6px 10px;
-    background: transparent;
-    border: 1px dashed var(--in-divider);
-    border-radius: 8px;
-    font-size: 12.5px;
+/* Inline address chip - sits alongside price + phone. Truncates
+ * mid-address with ellipsis if it overflows so the row stays a single
+ * line instead of collapsing to a full-width block. */
+.in-sheet__gitem--address {
     color: var(--in-ink) !important;
     text-decoration: none !important;
-    transition: background 120ms, border-color 120ms;
-}
-.in-sheet__gaddress:hover {
-    background: #FFFDF6;
-    border-color: var(--in-ink);
-}
-.in-sheet__gaddress > span:not(.in-sheet__gicon):not(.in-sheet__gaddress-cta) {
-    flex: 1;
+    max-width: 100%;
     min-width: 0;
+    overflow: hidden;
+}
+.in-sheet__gitem--address:hover { text-decoration: underline var(--in-accent) 2px !important; text-underline-offset: 2px; }
+.in-sheet__gaddress-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 260px;
 }
-.in-sheet__gaddress .in-sheet__gicon { color: var(--in-mute3); }
-.in-sheet__gaddress-cta {
-    color: var(--in-mute);
-    font-weight: 600;
-    font-size: 11.5px;
-    flex-shrink: 0;
-}
-.in-sheet__gaddress--nodetail { border-style: solid; }
 
 /* Per-item pending state. Individual gitems get --pending when the
  * server hasn't returned data for them yet. Blur + pulse just that

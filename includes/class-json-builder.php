@@ -282,10 +282,17 @@ final class JsonBuilder {
     }
 
     private function shape_poi( array $poi ): array {
+        // Titles from WP's get_the_title() come back with HTML entities
+        // already encoded ("Hotel &amp; Spa"). Our client template
+        // then escapes again on output ("Hotel &amp;amp; Spa") which
+        // shows the literal "&amp;" on the page. Decode once here so
+        // the string that reaches the browser is plain text.
+        $title = isset( $poi['title'] ) ? html_entity_decode( (string) $poi['title'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) : '';
+        $name  = isset( $poi['name'] )  ? html_entity_decode( (string) $poi['name'],  ENT_QUOTES | ENT_HTML5, 'UTF-8' ) : $title;
         return array(
             'id'            => isset( $poi['id'] ) ? (string) $poi['id'] : '',
-            'title'         => isset( $poi['title'] ) ? (string) $poi['title'] : '',
-            'name'          => isset( $poi['name'] ) ? (string) $poi['name'] : ( isset( $poi['title'] ) ? (string) $poi['title'] : '' ),
+            'title'         => $title,
+            'name'          => $name,
             'lat'           => (float) $poi['lat'],
             'lon'           => (float) $poi['lon'],
             'description'   => isset( $poi['description'] ) ? (string) $poi['description'] : '',

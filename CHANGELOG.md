@@ -1,4 +1,23 @@
 # Changelog
+## 0.7.8 - 2026-05-14
+
+- **`&amp;` in POI titles fixed.** WP's `get_the_title()` returns
+  titles with HTML entities already encoded ("Hotel &amp; Spa").
+  Our client template then escaped again on output, so visitors
+  saw the literal `&amp;`. `JsonBuilder::shape_poi()` now runs
+  `html_entity_decode(ENT_QUOTES | ENT_HTML5)` on title + name once
+  server-side; the template escape runs on plain text and produces
+  clean `&`.
+- **Secondary row now inline** — price, phone, and address/directions
+  sit on ONE horizontal line as chip-like items. The old
+  full-width dashed "Get directions" block is gone. Address text
+  truncates with ellipsis (max 260px) so long street addresses
+  don't force a wrap.
+- **Address chip = "📍 <address>"** clicking anywhere on it opens
+  Google Maps directions to the POI's lat/lon. Address text shows
+  when Places returned one, otherwise fallback label "Get directions"
+  (same click behaviour).
+
 ## 0.7.7 - 2026-05-14
 
 - **All Google-strip icons are outline-only, muted grey now** (no
