@@ -36,6 +36,14 @@ final class Pwa {
         add_action( 'template_redirect', array( $this, 'maybe_serve' ), 1 );
         add_action( 'wp_head', array( $this, 'render_head_tags' ), 2 );
         add_action( 'wp_footer', array( $this, 'render_sw_registrar' ), 99 );
+
+        // Legacy-URL shim for installed PWAs. After yuna-innsight is
+        // deleted the browser still fetches its cached SW URL etc; we
+        // intercept those paths and serve the same output as our new
+        // rewrite endpoints so installed PWAs auto-swap the SW next
+        // time the browser polls (browsers re-check SW URLs every
+        // ~24h or on every navigation, whichever comes first).
+        add_action( 'plugins_loaded', array( $this, 'maybe_serve_legacy_pwa' ), 0 );
     }
 
     /* ─── URL routing ─────────────────────────────────────────────────────── */
@@ -58,7 +66,7 @@ final class Pwa {
 
     /* ─── Manifest ────────────────────────────────────────────────────────── */
 
-    private function serve_manifest(): void {
+    public function serve_manifest(): void {
         $s = innsight_settings();
         $data = array(
             'name'             => (string) ( $s['pwa_name']       ?? '' ) ?: (string) get_bloginfo( 'name' ),
@@ -99,7 +107,7 @@ final class Pwa {
 
     /* ─── Service worker ──────────────────────────────────────────────────── */
 
-    private function serve_sw(): void {
+    public function serve_sw(): void {
         $sw = INNSIGHT_PATH . 'assets/pwa/sw.js';
         if ( ! is_readable( $sw ) ) {
             status_header( 404 );
@@ -167,6 +175,54 @@ final class Pwa {
              'if(window.console)console.info("[innsight] sw register skipped:",e&&e.message);' .
              '});});})();' .
              '</script>' . "\n";
+    }
+
+    /* ─── Legacy yuna-innsight URL shim ──────────────────────────────────── */
+
+    /**
+     * Serve the yuna-innsight PWA URLs from our new plugin so installed
+     * PWAs on visitors' phones don't break when the old plugin folder
+     * is deleted. Hooked super-early (plugins_loaded priority 0) so we
+     * can short-circuit before WP does any heavy loading.
+     *
+     * Only fires when:
+     *   - the yuna-innsight plugin folder is truly gone (we don't want
+     *     to duplicate-serve when it's still installed);
+     *   - the request path starts with the old plugin's URL prefix.
+     *
+     * Handles three URL shapes:
+     *   /wp-content/plugins/yuna-innsight/manifest.json     -> dynamic manifest
+     *   /wp-content/plugins/yuna-innsight/js/sw.js          -> new SW body
+     *   /wp-content/plugins/yuna-innsight/img/<file>        -> 302 to bundled icon
+     */
+    public function maybe_serve_legacy_pwa(): void {
+        $uri = strtok( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), '?' );
+        if ( strpos( $uri, '/wp-content/plugins/yuna-innsight/' ) === false ) return;
+        // If the old plugin folder still exists on disk, we let the
+        // webserver serve those files directly - no interception.
+        if ( is_dir( WP_PLUGIN_DIR . '/yuna-innsight' ) ) return;
+
+        if ( preg_match( '#/wp-content/plugins/yuna-innsight/manifest\.json$#', $uri ) ) {
+            $this->serve_manifest();
+            return;
+        }
+        if ( preg_match( '#/wp-content/plugins/yuna-innsight/js/sw\.js$#', $uri ) ) {
+            $this->serve_sw();
+            return;
+        }
+        if ( preg_match( '#/wp-content/plugins/yuna-innsight/img/([A-Za-z0-9_\-.]+)$#', $uri, $m ) ) {
+            $file    = $m[1];
+            $local   = INNSIGHT_PATH . 'assets/pwa/img/' . $file;
+            $fallback = INNSIGHT_PATH . 'assets/pwa/img/icon-192.png';
+            $path    = is_readable( $local ) ? $local : ( is_readable( $fallback ) ? $fallback : '' );
+            if ( $path === '' ) { status_header( 404 ); exit; }
+            $ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+            $mime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : ( $ext === 'svg' ? 'image/svg+xml' : 'image/png' );
+            header( 'Content-Type: ' . $mime );
+            header( 'Cache-Control: public, max-age=86400' );
+            readfile( $path );
+            exit;
+        }
     }
 
     /* ─── Activation / deactivation ──────────────────────────────────────── */

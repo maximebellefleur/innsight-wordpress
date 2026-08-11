@@ -1,4 +1,24 @@
 # Changelog
+## 0.7.11 - 2026-05-14
+
+- **Legacy yuna-innsight PWA URL shim** so installed PWAs on
+  visitors' phones don't break when the old plugin folder is
+  deleted. Hooked on `plugins_loaded` priority 0 (fires super-early),
+  fires only when `WP_PLUGIN_DIR/yuna-innsight/` no longer exists.
+  Serves:
+  - `/wp-content/plugins/yuna-innsight/manifest.json`
+    → our new dynamic manifest (same JSON body as
+    `/innsight-manifest.webmanifest`).
+  - `/wp-content/plugins/yuna-innsight/js/sw.js`
+    → our new service-worker body (with
+    `Service-Worker-Allowed: /` header).
+  - `/wp-content/plugins/yuna-innsight/img/<file>`
+    → the bundled equivalent in `assets/pwa/img/` (falls back to
+    icon-192.png when the filename doesn't match).
+  Browsers re-poll SW URLs every ~24h (or on every navigation), so
+  installed PWAs will auto-swap to the new SW body without any user
+  action - no reinstall needed.
+
 ## 0.7.10 - 2026-05-14
 
 PWA support - the missing piece from the standalone-ready promise.
