@@ -3,7 +3,7 @@
  * Plugin Name:       Innsight
  * Plugin URI:        https://github.com/maximebellefleur/innsight-wordpress
  * Description:       Renders the Innsight map engine inside WordPress. Reads the existing yuna-innsight DB structures (POI taxonomy, portfolio activities, event posts, options-page defaults) and emits a v1 JSON config for the Innsight JS engine. Provides a [innsight_map] shortcode (and a [custom_map] alias) plus a /wp-json/innsight/v1/map REST endpoint.
- * Version:           0.7.9
+ * Version:           0.7.10
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Maxime Bellefleur / Solike Group
@@ -22,7 +22,7 @@ if ( defined( 'INNSIGHT_VERSION' ) ) {
     return;
 }
 
-define( 'INNSIGHT_VERSION', '0.7.9' );
+define( 'INNSIGHT_VERSION', '0.7.10' );
 define( 'INNSIGHT_FILE', __FILE__ );
 define( 'INNSIGHT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'INNSIGHT_URL', plugin_dir_url( __FILE__ ) );
@@ -64,7 +64,6 @@ add_action( 'plugins_loaded', static function () {
 
 register_activation_hook( __FILE__, static function () {
     add_option( 'innsight_settings', \Innsight\Settings::defaults(), '', 'no' );
-    flush_rewrite_rules();
     // Install / upgrade the analytics table (dbDelta handles both).
     if ( class_exists( '\\Innsight\\Stats' ) ) {
         \Innsight\Stats::install();
@@ -72,6 +71,14 @@ register_activation_hook( __FILE__, static function () {
     // Install / upgrade the Google Places cache table.
     if ( class_exists( '\\Innsight\\Places' ) ) {
         \Innsight\Places::install();
+    }
+    // Register the PWA rewrite rules THEN flush so
+    // /innsight-manifest.webmanifest + /innsight-sw.js resolve
+    // without the admin having to visit Settings > Permalinks.
+    if ( class_exists( '\\Innsight\\Pwa' ) ) {
+        \Innsight\Pwa::activate();
+    } else {
+        flush_rewrite_rules();
     }
     // Purge our partial cache transients on activation so a manual
     // re-zip / FTP upload that preserves file mtimes doesn't leave

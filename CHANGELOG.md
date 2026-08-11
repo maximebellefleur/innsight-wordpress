@@ -1,4 +1,69 @@
 # Changelog
+## 0.7.10 - 2026-05-14
+
+PWA support - the missing piece from the standalone-ready promise.
+
+### What was missing
+
+yuna-innsight owned the entire PWA stack: `manifest.json`, service
+worker, `<link rel="manifest">` in the head, apple-touch-icon +
+splash-screen tags, icons. Deleting the old plugin blanked out
+every installed PWA on visitors' phones.
+
+### New Pwa service
+
+- **Rewrite URLs**: `/innsight-manifest.webmanifest` and
+  `/innsight-sw.js`. Both are dynamic PHP handlers so we can send
+  the right response headers (esp. `Service-Worker-Allowed: /` so
+  the SW claims scope over the whole site, not just the
+  plugin-assets subpath).
+- **Manifest** built from admin settings: name, short_name,
+  description, start_url, scope, theme_color, background_color,
+  four icon URLs (192/512 + 192/512 maskable). Defaults use the
+  bundled icons in `assets/pwa/img/` and fall back to `bloginfo`
+  values when the admin leaves things empty.
+- **Service worker** (`assets/pwa/sw.js`) with two strategies:
+  network-first for HTML (fresh content wins online, cached wins
+  offline), cache-first for static assets. Cache versioned so a
+  plugin update evicts stale entries on the next `activate`.
+- **`<head>` tags** on every page: manifest link, theme-color,
+  mobile-web-app-capable, apple-mobile-web-app-capable + status-bar
+  style, apple-touch-icon (bundled defaults for 152/167/180 sizes),
+  seven apple-touch-startup-image splash screens for common iOS
+  viewports.
+- **Inline SW registrar** in the footer, scoped `/`, silent on
+  failure so a locked-down host doesn't break anything else.
+
+### Bundled icons
+
+Copied from the yuna-innsight `img/` folder into
+`assets/pwa/img/`: icon-192 / icon-512 (+ maskable variants),
+apple-touch-icon, hostel-icon iOS sizes, seven apple_splash sizes,
+plus screenshot-desktop / screenshot-mobile / screenshot-mobile-wide
+for the manifest's screenshots field.
+
+### Settings
+
+New "PWA (installable web app)" section on Settings → Innsight with
+13 fields: enable toggle, name, short_name, description, start_url,
+scope, theme + bg colors, five icon URLs. Sensible defaults so
+zero-config installs just work.
+
+### Migration note for the current site
+
+Existing installed PWAs on visitors' phones still point to
+`/wp-content/plugins/yuna-innsight/manifest.json`. Two options:
+
+1. **Keep yuna-innsight files on disk** (deactivate is enough - the
+   static files still serve). Installed PWAs continue working.
+2. **Delete yuna-innsight entirely**. Installed PWAs 404 and need
+   reinstall from the new manifest URL:
+   `https://www.balmers.com/innsight-manifest.webmanifest`
+   (add-to-home-screen from the map page after upgrade).
+
+Activation hook flushes rewrite rules so the two pretty URLs
+resolve immediately, no manual permalink save needed.
+
 ## 0.7.9 - 2026-05-14
 
 Standalone-ready. Once you delete/deactivate the legacy `yuna-innsight`

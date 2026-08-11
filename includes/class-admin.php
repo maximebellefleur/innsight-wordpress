@@ -85,6 +85,7 @@ final class Admin {
         add_settings_section( 'innsight_render', __( 'Render mode & UI', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_share', __( 'Share wishlist', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_analytics', __( 'Analytics', 'innsight' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'innsight_pwa', __( 'PWA (installable web app)', 'innsight' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'innsight_geocoder', __( 'Geocoder', 'innsight' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'engine_source', __( 'Engine source', 'innsight' ), 'innsight_engine', 'render_engine_source' );
@@ -121,6 +122,20 @@ final class Admin {
         $this->add_field( 'share_chip_label', __( "Friend's-picks chip label", 'innsight' ), 'innsight_share', 'render_text', __( 'Label shown on the dancing chip in the filter bar after the recipient picks "Just preview".', 'innsight' ) );
 
         $this->add_field( 'analytics_enabled', __( 'Collect anonymous usage stats', 'innsight' ), 'innsight_analytics', 'render_checkbox', __( 'Tracks map loads, POI opens/saves, and share activity as day-bucketed aggregate counts. No visitor identity, no IP stored, no cookies. Powers the Dashboard widget + Analytics page.', 'innsight' ) );
+
+        $this->add_field( 'pwa_enabled',     __( 'Enable PWA (installable app)', 'innsight' ), 'innsight_pwa', 'render_checkbox', __( 'Serves a manifest.json + service worker + adds the required <head> tags so the site is installable to home-screen. Manifest URL: /innsight-manifest.webmanifest', 'innsight' ) );
+        $this->add_field( 'pwa_name',        __( 'App name', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Full name shown on the install prompt. Empty = site title.', 'innsight' ) );
+        $this->add_field( 'pwa_short_name',  __( 'Short name', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Under 12 chars, shown under the home-screen icon. Empty = first 12 of site title.', 'innsight' ) );
+        $this->add_field( 'pwa_description', __( 'Description', 'innsight' ), 'innsight_pwa', 'render_text' );
+        $this->add_field( 'pwa_start_url',   __( 'Start URL', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Where the PWA opens on launch. Empty = homepage. Typically the map page.', 'innsight' ) );
+        $this->add_field( 'pwa_scope',       __( 'Scope', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Which URLs the PWA controls. Empty = site root.', 'innsight' ) );
+        $this->add_field( 'pwa_theme_color', __( 'Theme color', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Hex (e.g. #FFFFFF). Colours the phone status bar when installed.', 'innsight' ) );
+        $this->add_field( 'pwa_bg_color',    __( 'Background color', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Hex. Shown during launch splash before the first paint.', 'innsight' ) );
+        $this->add_field( 'pwa_icon_192',    __( 'Icon 192×192 URL', 'innsight' ), 'innsight_pwa', 'render_text', __( 'Empty = bundled default in assets/pwa/img/icon-192.png', 'innsight' ) );
+        $this->add_field( 'pwa_icon_512',    __( 'Icon 512×512 URL', 'innsight' ), 'innsight_pwa', 'render_text' );
+        $this->add_field( 'pwa_icon_192m',   __( 'Icon 192×192 (maskable) URL', 'innsight' ), 'innsight_pwa', 'render_text' );
+        $this->add_field( 'pwa_icon_512m',   __( 'Icon 512×512 (maskable) URL', 'innsight' ), 'innsight_pwa', 'render_text' );
+        $this->add_field( 'pwa_apple_touch', __( 'Apple touch icon URL', 'innsight' ), 'innsight_pwa', 'render_text' );
 
         $this->add_field( 'geocoder_email', __( 'Nominatim contact email', 'innsight' ), 'innsight_geocoder', 'render_text', __( 'Sent in the User-Agent header per Nominatim usage policy.', 'innsight' ) );
         $this->add_field( 'geocoder_cache_hours', __( 'Geocoder cache TTL (hours)', 'innsight' ), 'innsight_geocoder', 'render_number' );

@@ -106,6 +106,24 @@ final class Settings {
             // aggregates only. On by default; admins who want zero
             // telemetry can flip this off in Settings.
             'analytics_enabled'       => 1,
+
+            // PWA: manifest + service worker + head tags. Ports the
+            // yuna-innsight PWA plumbing so installed home-screen apps
+            // keep working. Icons default to bundled Balmers-tinted
+            // PNGs in assets/pwa/img/; admins override each via URL.
+            'pwa_enabled'             => 1,
+            'pwa_name'                => '',
+            'pwa_short_name'          => '',
+            'pwa_description'         => '',
+            'pwa_start_url'           => '',
+            'pwa_scope'               => '',
+            'pwa_theme_color'         => '#FFFFFF',
+            'pwa_bg_color'            => '#FFFFFF',
+            'pwa_icon_192'            => '',
+            'pwa_icon_512'            => '',
+            'pwa_icon_192m'           => '',
+            'pwa_icon_512m'           => '',
+            'pwa_apple_touch'         => '',
         );
     }
 
@@ -174,6 +192,20 @@ final class Settings {
         }
 
         $clean['analytics_enabled']    = ! empty( $raw['analytics_enabled'] ) ? 1 : 0;
+
+        // PWA fields. Text stripped, URLs cleaned via esc_url_raw,
+        // colors normalised to #RRGGBB.
+        $clean['pwa_enabled']          = ! empty( $raw['pwa_enabled'] ) ? 1 : 0;
+        foreach ( array( 'pwa_name', 'pwa_short_name', 'pwa_description' ) as $k ) {
+            $clean[ $k ] = isset( $raw[ $k ] ) ? wp_strip_all_tags( (string) $raw[ $k ] ) : '';
+        }
+        foreach ( array( 'pwa_start_url', 'pwa_scope', 'pwa_icon_192', 'pwa_icon_512', 'pwa_icon_192m', 'pwa_icon_512m', 'pwa_apple_touch' ) as $k ) {
+            $clean[ $k ] = isset( $raw[ $k ] ) ? esc_url_raw( (string) $raw[ $k ] ) : '';
+        }
+        foreach ( array( 'pwa_theme_color', 'pwa_bg_color' ) as $k ) {
+            $v = isset( $raw[ $k ] ) ? sanitize_hex_color( (string) $raw[ $k ] ) : null;
+            $clean[ $k ] = $v ?: (string) ( $defaults[ $k ] ?? '#FFFFFF' );
+        }
 
         return $clean;
     }
