@@ -1,4 +1,73 @@
 # Changelog
+## 0.7.12 - 2026-05-14
+
+Full standalone recovery. Audit of yuna-innsight.php surfaced four
+more things I hadn't ported. All added.
+
+### `page-map.php` template
+
+Legacy plugin registered a "Map Page" template. The Balmers map page
+had `_wp_page_template` meta pointing at
+`/full/path/to/wp-content/plugins/yuna-innsight/page-map.php`. When
+that file disappeared, WP fell back to the theme's default template
+which doesn't include the map shortcode → visitors saw an empty
+page (this is why the PWA looked broken).
+
+- **New `templates/page-map.php`** — same shape as yuna's: minimal
+  <html>/<head>/<body> with `body.app-loading` + `<div class="loader">`
+  so the legacy loader CSS still fires; renders the page's own
+  content (falls back to `[innsight_map height="100dvh"]` when
+  empty); calls `get_footer()` so theme footer scripts run.
+- **New `LegacyTemplate` service** that:
+  - Registers our template in `theme_page_templates` under both
+    the new slug (`templates/page-map.php`) AND the legacy slug
+    (`yuna-innsight/page-map.php`).
+  - Intercepts `template_include` (priority 99) so pages whose
+    stored meta is EITHER slug load our file. No manual admin
+    action needed — the map page just starts rendering again.
+  - Exposes a one-click migrator (admin-post
+    `innsight_migrate_map_template`) that re-points every
+    `_wp_page_template` meta ending in `yuna-innsight/page-map.php`
+    to our new slug. Optional cleanup.
+
+### Main More Info URL field on POI term edit
+
+Legacy plugin added a "Main More Info Button URL" select on each
+POI term edit screen, storing `main_more_info_url` term meta.
+`LegacyMisc::render_main_more_info_field()` puts it back with the
+same field name so existing meta keeps resolving — populated from
+posts tagged with the POI, with a "— none —" option that falls back
+to the Featured-in popover.
+
+### Portfolio → Activities labels
+
+Cosmetic-only override the legacy plugin applied to the `portfolio`
+custom post type via `register_post_type_args`. `LegacyMisc::rename_portfolio_labels()`
+mirrors it (name, singular, add-new, edit-item, all-items, menu-name)
+so the admin sees the familiar "Activities" menu after yuna is
+gone.
+
+### PWA install banner in footer
+
+Legacy plugin printed an "Add to Home Screen" install prompt in
+`wp_footer` with `beforeinstallprompt` handling for Chrome/Android
+and a manual iOS instruction card. Ported into `LegacyMisc::render_install_banner()`
+in a simplified but functional form: only appears on pages using
+the map template, dismissible, remembered in localStorage.
+
+### Bundled extra icons
+
+Copied the remaining legacy icons the yuna manifest/CSS referenced:
+- `balmers-hostel-map-interlaken-switzerland-192x192.png`
+- `balmers-hostel-map-interlaken-switzerland-512x512.png`
+- `google-maps-balmers.png`
+- `apple-maps-balmers.png`
+- `maps-me-balmers.png`
+
+Now if any cached HTML/CSS anywhere still points at
+`/wp-content/plugins/yuna-innsight/img/<any-of-these>`, the shim in
+0.7.11 serves the correct bundled PNG.
+
 ## 0.7.11 - 2026-05-14
 
 - **Legacy yuna-innsight PWA URL shim** so installed PWAs on

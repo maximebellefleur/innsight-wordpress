@@ -65,6 +65,10 @@ final class Plugin {
     private $legacy_acf;
     /** @var Pwa */
     private $pwa;
+    /** @var LegacyTemplate */
+    private $legacy_template;
+    /** @var LegacyMisc */
+    private $legacy_misc;
     /** @var bool */
     private $booted = false;
 
@@ -100,6 +104,8 @@ final class Plugin {
         $this->analytics_page  = new AnalyticsPage( $this->stats );
         $this->legacy_acf      = new LegacyAcf();
         $this->pwa             = new Pwa();
+        $this->legacy_template = new LegacyTemplate();
+        $this->legacy_misc     = new LegacyMisc();
         $this->kml_export      = new KmlExport( $this->data_source );
         $this->admin           = new Admin();
         $this->poi_post_type   = new PoiPostType();
@@ -140,6 +146,8 @@ final class Plugin {
             'places'          => $this->places,
             'legacy_acf'      => $this->legacy_acf,
             'pwa'             => $this->pwa,
+            'legacy_template' => $this->legacy_template,
+            'legacy_misc'     => $this->legacy_misc,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
@@ -160,6 +168,8 @@ final class Plugin {
         $this->places->register();
         $this->legacy_acf->register();
         $this->pwa->register();
+        $this->legacy_template->register();
+        $this->legacy_misc->register();
         if ( is_admin() ) {
             $this->admin->register();
             $this->defaults_page->register();
