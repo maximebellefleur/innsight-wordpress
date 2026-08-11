@@ -87,6 +87,16 @@ final class Settings {
             // it through DOM rewrites so HTML in the value is escaped.
             'wordmark_prefix'      => '',
 
+            // Base marker (hostel). Rendered as a taped-photo print on
+            // the map for the pinned POI - the same one findHostelRef()
+            // resolves for "distance from base" labels. photo = attachment
+            // ID (WP media picker); label overrides the auto-derived
+            // caption; rings = minutes for the walk-time circles (empty
+            // array hides them).
+            'base_photo'           => 0,
+            'base_label'           => '',
+            'base_rings'           => '5,10',
+
             // Share-wishlist feature (innsight2026 only). When enabled, the
             // Saved tab gets a top-right Share button that lets the visitor
             // ship their saved list as a tokenized URL. The recipient sees
@@ -181,6 +191,15 @@ final class Settings {
         // long brand doesn't overflow the chrome row.
         $wm = isset( $raw['wordmark_prefix'] ) ? wp_strip_all_tags( (string) $raw['wordmark_prefix'] ) : '';
         $clean['wordmark_prefix']      = mb_substr( trim( $wm ), 0, 40 );
+
+        // Base marker fields.
+        $clean['base_photo']           = isset( $raw['base_photo'] ) ? (int) $raw['base_photo'] : 0;
+        $clean['base_label']           = isset( $raw['base_label'] ) ? mb_substr( wp_strip_all_tags( (string) $raw['base_label'] ), 0, 40 ) : '';
+        // Rings: comma / space separated positive integers. "5, 10" or
+        // "5,10" or empty for none.
+        $rings_raw = isset( $raw['base_rings'] ) ? (string) $raw['base_rings'] : '';
+        $rings = array_filter( array_map( 'intval', preg_split( '/[,\s]+/', trim( $rings_raw ) ) ), function ( $n ) { return $n > 0 && $n <= 120; } );
+        $clean['base_rings']           = implode( ',', array_slice( array_values( array_unique( $rings ) ), 0, 4 ) );
 
         // Share-wishlist copy. Plain-text fields the recipient sees in the
         // receive popup + the dancing chip label. Stripped to avoid HTML

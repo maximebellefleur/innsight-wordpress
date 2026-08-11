@@ -1,0 +1,16 @@
+<div class="in-base">
+    <div class="in-base__dot" aria-hidden="true"></div>
+    <div class="in-base__print">
+        <div class="in-base__tape" aria-hidden="true"></div>
+        <div class="in-base__frame">
+            {{#if basePhoto}}<img class="in-base__img" src="{{basePhotoThumb}}"
+                 srcset="{{basePhotoThumb}} 1x, {{basePhoto}} 2x"
+                 alt="{{baseAlt}}" loading="eager" decoding="async">{{/if}}
+            <span class="in-base__ph" aria-hidden="true">hostel photo</span>
+        </div>
+        <div class="in-base__caption">
+            <span class="in-base__name">{{baseLabel}}</span>
+            <span class="in-base__kicker">HOME</span>
+        </div>
+    </div>
+</div>

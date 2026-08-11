@@ -96,6 +96,9 @@ final class Admin {
             __( 'Choose which skin renders the map. The new 2026 design needs a Mapbox access token (see below).', 'innsight' ) );
         $this->add_field( 'wordmark_prefix', __( 'Wordmark prefix (client name)', 'innsight' ), 'innsight_design', 'render_text',
             __( 'Shown before "→ Innsight" in the header/list/saved view wordmarks. Example: "Balmers" renders as "Balmers → Innsight". Leave empty for plain "Innsight".', 'innsight' ) );
+        $this->add_field( 'base_photo',     __( 'Base photo', 'innsight' ),        'innsight_design', 'render_attachment', __( 'Photo of the hostel / base location. Shown on the map as a taped-photo print above the base pin. Empty = striped placeholder.', 'innsight' ) );
+        $this->add_field( 'base_label',     __( 'Base label', 'innsight' ),        'innsight_design', 'render_text',       __( 'Caption on the base marker (e.g. "Balmers"). Empty falls back to the wordmark prefix, then to the POI title.', 'innsight' ) );
+        $this->add_field( 'base_rings',     __( 'Walk-time rings (min)', 'innsight' ), 'innsight_design', 'render_text',   __( 'Comma-separated minutes for the dashed circles around the base (e.g. "5,10"). 80 m / walking minute. Empty = no rings.', 'innsight' ) );
 
         $this->add_field( 'provider_default', __( 'Default provider', 'innsight' ), 'innsight_provider', 'render_provider_default' );
         $this->add_field( 'mapbox_access_token', __( 'Mapbox access token', 'innsight' ), 'innsight_provider', 'render_text' );
@@ -423,5 +426,63 @@ final class Admin {
 
     public function render_textarea( string $key, $value ): void {
         echo '<textarea class="large-text" rows="3" name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '">' . esc_textarea( (string) $value ) . '</textarea>';
+    }
+
+    /**
+     * Attachment (image) picker. Uses the WP Media Library popup;
+     * stores the numeric attachment ID. Preview + Choose/Change/Clear
+     * inline. Enqueues wp.media on the settings page.
+     */
+    public function render_attachment( string $key, $value ): void {
+        wp_enqueue_media();
+        $id  = (int) $value;
+        $url = $id ? (string) wp_get_attachment_image_url( $id, 'medium' ) : '';
+        $name_attr = esc_attr( self::OPTION_NAME . '[' . $key . ']' );
+        $dom_id    = 'innsight-attach-' . esc_attr( $key );
+        ?>
+        <div class="innsight-attach-picker" data-picker-id="<?php echo esc_attr( $dom_id ); ?>">
+            <input type="hidden" id="<?php echo esc_attr( $dom_id ); ?>" name="<?php echo $name_attr; // phpcs:ignore ?>" value="<?php echo esc_attr( (string) $id ); ?>">
+            <div class="innsight-attach-preview" style="margin-bottom:6px">
+                <?php if ( $url ) : ?>
+                    <img src="<?php echo esc_url( $url ); ?>" style="max-width:180px;max-height:120px;border:1px solid #dcdcde;border-radius:4px;display:block">
+                <?php else : ?>
+                    <em style="color:#646970">No image selected.</em>
+                <?php endif; ?>
+            </div>
+            <button type="button" class="button innsight-attach-choose"><?php echo $id ? esc_html__( 'Change image', 'innsight' ) : esc_html__( 'Choose image', 'innsight' ); ?></button>
+            <button type="button" class="button innsight-attach-clear" <?php disabled( ! $id ); ?>><?php esc_html_e( 'Clear', 'innsight' ); ?></button>
+        </div>
+        <script>
+        (function(){
+            var wrap = document.querySelector('.innsight-attach-picker[data-picker-id="<?php echo esc_js( $dom_id ); ?>"]');
+            if (!wrap || wrap.__innsightBound) return;
+            wrap.__innsightBound = true;
+            var input = wrap.querySelector('input[type=hidden]');
+            var preview = wrap.querySelector('.innsight-attach-preview');
+            var chooseBtn = wrap.querySelector('.innsight-attach-choose');
+            var clearBtn  = wrap.querySelector('.innsight-attach-clear');
+            var frame;
+            chooseBtn.addEventListener('click', function () {
+                if (frame) { frame.open(); return; }
+                frame = wp.media({ title: 'Choose image', button: { text: 'Use this image' }, library: { type: 'image' }, multiple: false });
+                frame.on('select', function () {
+                    var att = frame.state().get('selection').first().toJSON();
+                    input.value = att.id;
+                    var url = (att.sizes && att.sizes.medium ? att.sizes.medium.url : att.url);
+                    preview.innerHTML = '<img src="' + url + '" style="max-width:180px;max-height:120px;border:1px solid #dcdcde;border-radius:4px;display:block">';
+                    chooseBtn.textContent = 'Change image';
+                    clearBtn.disabled = false;
+                });
+                frame.open();
+            });
+            clearBtn.addEventListener('click', function () {
+                input.value = '';
+                preview.innerHTML = '<em style="color:#646970">No image selected.</em>';
+                chooseBtn.textContent = 'Choose image';
+                clearBtn.disabled = true;
+            });
+        })();
+        </script>
+        <?php
     }
 }

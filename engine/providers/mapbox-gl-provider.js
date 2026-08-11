@@ -107,6 +107,11 @@
                 ev.stopPropagation();
                 spec.onClick(ev);
             });
+        } else {
+            // No click handler = display-only marker (e.g. the base
+            // hostel print). Kill pointer events so it doesn't steal
+            // clicks from the map underneath.
+            el.style.pointerEvents = 'none';
         }
         var marker = new this._gl.Marker({ element: el, anchor: 'bottom' })
             .setLngLat([spec.lon, spec.lat])
@@ -232,6 +237,132 @@
             b.extend(this._markers[i].getLngLat());
         }
         return b;
+    };
+
+    /**
+     * Walk-time rings around the base marker. Renders one GeoJSON
+     * source with two circle polygons (5-min + 10-min, or whatever
+     * minute array the caller passes) at 80 m per walking minute.
+     * Two line layers (outer/inner) draw dashed borders; the inner
+     * ring gets a subtle accent-tinted fill. A pair of DOM marker
+     * chips at bearing 135° label each ring in minutes.
+     *
+     * All layers/labels hide below zoom 13 - at city scale they
+     * cover the whole viewport and mean nothing.
+     */
+    MapboxGLProvider.prototype.addWalkRings = function (lat, lon, minutes) {
+        if (!minutes || !minutes.length) return;
+        // Deterministic id so re-calls (e.g. after a filter re-render)
+        // replace rather than stack.
+        var self = this;
+        var sourceId = 'innsight-base-rings';
+        var METRES_PER_MIN = 80;
+
+        function metersToPolygon(centerLat, centerLon, radiusM, steps) {
+            // Simple equirectangular projection - good enough at pedestrian
+            // radii (< 1 km) for a decoratively-drawn ring. Angular offsets
+            // shrink with latitude for the longitude axis.
+            steps = steps || 64;
+            var pts = [];
+            var latRad = centerLat * Math.PI / 180;
+            var mPerDegLat = 111320;
+            var mPerDegLon = 111320 * Math.cos(latRad);
+            for (var i = 0; i <= steps; i++) {
+                var t = (i / steps) * Math.PI * 2;
+                var dx = Math.cos(t) * radiusM;
+                var dy = Math.sin(t) * radiusM;
+                pts.push([ centerLon + dx / mPerDegLon, centerLat + dy / mPerDegLat ]);
+            }
+            return pts;
+        }
+
+        // Sorted so the outer ring paints first (fill only on inner).
+        var minsSorted = minutes.slice().sort(function (a, b) { return a - b; });
+        var features = minsSorted.map(function (min, idx) {
+            return {
+                type: 'Feature',
+                geometry: { type: 'Polygon', coordinates: [ metersToPolygon(lat, lon, min * METRES_PER_MIN) ] },
+                properties: { minutes: min, order: idx }
+            };
+        });
+        var geojson = { type: 'FeatureCollection', features: features };
+
+        var addLayers = function () {
+            // Clean up any prior render (e.g. after a config refresh).
+            if (self.native.getLayer('innsight-base-rings-fill'))    self.native.removeLayer('innsight-base-rings-fill');
+            if (self.native.getLayer('innsight-base-rings-line-in')) self.native.removeLayer('innsight-base-rings-line-in');
+            if (self.native.getLayer('innsight-base-rings-line-out'))self.native.removeLayer('innsight-base-rings-line-out');
+            if (self.native.getSource(sourceId))                     self.native.removeSource(sourceId);
+            self.native.addSource(sourceId, { type: 'geojson', data: geojson });
+            // Fill on the innermost ring only.
+            self.native.addLayer({
+                id: 'innsight-base-rings-fill', type: 'fill', source: sourceId,
+                minzoom: 13,
+                filter: ['==', ['get', 'order'], 0],
+                paint: { 'fill-color': 'rgba(201,247,63,0.14)' }
+            });
+            // Outer stroke (all rings).
+            self.native.addLayer({
+                id: 'innsight-base-rings-line-out', type: 'line', source: sourceId,
+                minzoom: 13,
+                paint: {
+                    'line-color': 'rgba(15,15,15,0.32)',
+                    'line-width': 2,
+                    'line-dasharray': [3, 3]
+                }
+            });
+            // Inner stroke (innermost only) - darker, so the "5 min"
+            // core reads a touch stronger than the "10 min" outer.
+            self.native.addLayer({
+                id: 'innsight-base-rings-line-in', type: 'line', source: sourceId,
+                minzoom: 13,
+                filter: ['==', ['get', 'order'], 0],
+                paint: {
+                    'line-color': 'rgba(15,15,15,0.45)',
+                    'line-width': 2,
+                    'line-dasharray': [3, 3]
+                }
+            });
+        };
+
+        if (this.native.isStyleLoaded()) addLayers();
+        else this.native.once('style.load', addLayers);
+
+        // Minute-label chips - one DOM marker per ring at bearing 135°.
+        // Kept in this._ringChips so hideRings/re-render can clean up.
+        this._ringChips = this._ringChips || [];
+        for (var i = 0; i < this._ringChips.length; i++) this._ringChips[i].remove();
+        this._ringChips = [];
+
+        var bearingRad = 135 * Math.PI / 180;
+        var latRad2 = lat * Math.PI / 180;
+        var mPerDegLat2 = 111320;
+        var mPerDegLon2 = 111320 * Math.cos(latRad2);
+        var glRef = this._gl;
+        var mapRef = this.native;
+
+        minsSorted.forEach(function (min) {
+            var r = min * METRES_PER_MIN;
+            var dx = Math.sin(bearingRad) * r;   // east component
+            var dy = Math.cos(bearingRad) * r;   // north; sin/cos flipped for compass bearing (0=N)
+            var chipLat = lat + dy / mPerDegLat2;
+            var chipLon = lon + dx / mPerDegLon2;
+            var el = document.createElement('div');
+            el.className = 'in-base__ring innsight-base-ring-host';
+            el.textContent = min + ' MIN';
+            el.style.pointerEvents = 'none';
+            var m = new glRef.Marker({ element: el, anchor: 'center' })
+                .setLngLat([chipLon, chipLat]);
+            // Show/hide chip in sync with the ring layers.
+            var syncChip = function () {
+                var z = mapRef.getZoom();
+                if (z >= 13 && !m._addedToMap) { m.addTo(mapRef); m._addedToMap = true; }
+                else if (z < 13 && m._addedToMap) { m.remove(); m._addedToMap = false; }
+            };
+            syncChip();
+            mapRef.on('zoom', syncChip);
+            self._ringChips.push(m);
+        });
     };
 
     MapboxGLProvider.prototype.destroy = function () {

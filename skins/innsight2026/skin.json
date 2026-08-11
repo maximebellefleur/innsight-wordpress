@@ -5,6 +5,7 @@
     "files": {
         "layout":     "layout.html",
         "pin":        "pin.html",
+        "base":       "base.html",
         "sheet":      "sheet.html",
         "listRow":    "list-row.html",
         "emptyState": "empty-state.html",

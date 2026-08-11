@@ -351,7 +351,7 @@
 }
 .in-tab[aria-selected="true"] .in-tab__underline { width: 18px; }
 
-/* ── Pin (per-POI) ───────────────────────────────────────────────────────── */
+/* ── Pin (per-POI, luggage-tag) ──────────────────────────────────────────── */
 /* Mapbox GL marker host. The engine's MapboxGLProvider sets className to
  * .innsight-pin-host for skins that supply a per-pin template. */
 .innsight-pin-host {
@@ -359,19 +359,52 @@
     background: transparent;
     will-change: transform;
 }
+/* Luggage-tag pin. The reinforced eyelet + short string dangles from
+ * the anchor point at the top; the coloured slot with the POI's
+ * photo/initial hangs beneath. Anchor stays at bottom for the tag body,
+ * so hover/tap position matches every other pin the engine renders. */
 .in-pin {
-    width: 44px; height: 44px;
+    position: relative;
+    width: 44px; height: 54px;
     animation: in-pin-pop 0.55s cubic-bezier(.5, 1.6, .4, 1) both;
     transform-origin: 50% 100%;
 }
-.in-pin__base {
-    width: 44px; height: 44px;
+.in-pin__hole {
+    position: absolute;
+    top: 0; left: 50%;
+    width: 8px; height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1.5px solid var(--in-ink);
+    z-index: 3;
+}
+.in-pin__string {
+    position: absolute;
+    top: 6px; left: 50%;
+    width: 1.5px; height: 8px;
+    margin-left: -0.75px;
+    background: var(--in-ink);
+    opacity: 0.7;
+    z-index: 2;
+}
+.in-pin__tag {
+    position: absolute;
+    top: 12px; left: 0; right: 0;
+    height: 42px;
+    padding: 3px;
+    background: #fff;
+    border: 1.5px solid var(--in-ink);
     border-radius: 8px;
-    border: 3px solid #fff;
-    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.85);
+    box-shadow: 2px 3px 0 rgba(15, 15, 15, 0.85);
     transform: rotate(-4deg);
-    overflow: hidden;
+    transform-origin: 50% 0;
+}
+.in-pin__slot {
     position: relative;
+    width: 100%; height: 100%;
+    border-radius: 5px;
+    overflow: hidden;
     background: var(--c, #FFB85C);
 }
 .in-pin__img {
@@ -393,7 +426,7 @@
     display: flex; align-items: center; justify-content: center;
     font-family: var(--in-font-display);
     font-style: italic;
-    font-size: 26px;
+    font-size: 22px;
     color: #fff;
     line-height: 1;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
@@ -1996,4 +2029,77 @@ body.innsight-sheet-locked {
 @media (min-width: 1280px) {
     .in-sheet__inner { width: 50%; max-width: 760px; }
     .in-share-menu__inner { width: 50%; max-width: 760px; }
+}
+
+/* ── Base marker (hostel) - taped-photo print ────────────────────────────── */
+/* Renders instead of the luggage-tag pin for the "home base" POI - the
+ * one JS resolves via findHostelRef() (pinned:true wins, else first
+ * type==='hostel'). Non-interactive: no cursor pointer, no click, no
+ * bottom sheet. The marker anchor is 'bottom' but positioned so the
+ * dot sits ON the coordinate and the print floats above it. */
+.in-base { position: relative; width: 0; height: 0; }
+.in-base__dot {
+    position: absolute; left: -6px; top: -6px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--in-accent); border: 2px solid var(--in-ink);
+}
+.in-base__print {
+    position: absolute; left: -52px; bottom: 14px;
+    padding: 8px 8px 0;
+    background: #fff;
+    border: 1.5px solid var(--in-ink);
+    box-shadow: 4px 5px 0 rgba(15, 15, 15, 0.85);
+    transform: rotate(-6deg);
+    animation: in-pin-pop 0.55s cubic-bezier(.5, 1.6, .4, 1) both;
+}
+.in-base__tape {
+    position: absolute; left: -16px; top: -11px;
+    width: 58px; height: 19px;
+    background: rgba(201, 247, 63, 0.9);          /* --in-accent, 90% */
+    border: 1px solid rgba(15, 15, 15, 0.25);
+    transform: rotate(-24deg);
+}
+.in-base__frame {
+    position: relative; width: 96px; height: 70px; overflow: hidden;
+    border: 1px solid rgba(15, 15, 15, 0.25);
+    background: repeating-linear-gradient(135deg, #E4DBC4 0 7px, #EFE8D8 7px 14px);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 6px;
+}
+.in-base__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.in-base__img + .in-base__ph { display: none; }        /* photo wins */
+.in-base__ph {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 7.5px; letter-spacing: .06em; color: var(--in-mute2);
+}
+.in-base__caption {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 7px 1px 9px;
+}
+.in-base__name {
+    font-family: var(--in-font-display);
+    font-style: italic;
+    font-size: 17px;
+    color: var(--in-ink);
+}
+.in-base__kicker {
+    font-size: 7.5px; font-weight: 700; letter-spacing: .14em;
+    color: var(--in-mute);
+}
+
+/* Walk-ring chips - DOM markers placed at bearing 135° from base,
+ * rendered as Mapbox HTML markers by the engine. Purely visual;
+ * click-through disabled so the map stays interactive underneath. */
+.in-base-ring-host { pointer-events: none; }
+.in-base__ring {
+    position: absolute;
+    padding: 2px 7px; border-radius: 999px;
+    background: var(--in-accent); border: 1.5px solid var(--in-ink);
+    font-size: 8.5px; font-weight: 700; letter-spacing: .12em;
+    color: var(--in-ink); white-space: nowrap;
+    box-shadow: 1px 1px 0 var(--in-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .in-base__print { animation: none !important; }
 }

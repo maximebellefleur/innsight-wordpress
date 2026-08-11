@@ -1,4 +1,67 @@
 # Changelog
+## 0.7.13 - 2026-05-14
+
+Map pin redesign for innsight2026 skin: luggage-tag POI pins + taped-photo
+base marker + walk rings.
+
+### POI pins - luggage tag
+
+`pin.html` + `.in-pin` block rewritten:
+- Reinforced eyelet (`.in-pin__hole`) + short string (`.in-pin__string`)
+  at the top - dangles from the anchor point.
+- Coloured slot (`.in-pin__slot`) with the POI's `imageThumb` washed to
+  the sticker colour + initial overlay. Rotated -4°.
+
+### Base marker (hostel) - taped photo print
+
+New `base.html` renders instead of `pin.html` for the resolved base POI:
+`.in-base__dot` (accent chip on the coordinate) + `.in-base__print`
+(white photo frame, rotated -6°, drop shadow) + `.in-base__tape` (accent
+tape at -24°) + `.in-base__frame` (striped-cardboard placeholder that
+shows when no photo is uploaded; hidden by the `<img>` when present) +
+`.in-base__caption` with `label` + `HOME` kicker.
+
+### Engine changes
+
+- `markers.js` now picks `partials.base` for the POI that
+  `findHostelRef` would resolve (`pinned:true` wins, else first
+  `type/cat === 'hostel'`) and renders that partial instead of
+  `pin.html`. Base marker is non-interactive: no `onClick`, no
+  `onPopupOpen`, `pointer-events: none` on the marker DOM.
+- `mapbox-gl-provider.addMarker` gained a `pointer-events: none`
+  fallback for spec objects without an `onClick` (base marker).
+- `mapbox-gl-provider.addWalkRings(lat, lon, minutes)` renders a
+  GeoJSON source with two circle polygons at 80 m/min. Two line
+  layers (outer/inner) with dashed strokes + a subtle accent-tinted
+  fill on the innermost. Minute-label chips (`.in-base__ring` DOM
+  markers) placed at bearing 135°. Everything auto-hidden below
+  zoom 13 (both the layers and the chips sync on `zoom` events).
+
+### Settings
+
+New Design fields:
+- **Base photo** (WP Media Library picker; stores attachment ID).
+  Resolves at build time to two URLs (medium + thumbnail); a
+  deleted attachment yields no photo key (never a broken URL). New
+  `render_attachment` helper enqueues `wp_media` and wires
+  Choose/Change/Clear.
+- **Base label** (text, ≤ 40 chars). Falls back to wordmark prefix
+  then POI title.
+- **Walk-time rings (min)** (comma-separated ints; empty = no rings).
+  Sanitiser caps each at 120, dedupes, keeps at most 4.
+
+### JSON contract
+
+`config.branding.base = { photo, photoThumb, alt, label, rings[] }`
+added by JsonBuilder. Base key only appears when the attachment
+resolves + at least one setting is present.
+
+### Nothing else moved
+
+`:root` tokens (skin.css lines 9-34) untouched. `layout.html`,
+`sheet.html`, `list-row.html`, `empty-state.html`, `mapbox-style.json`,
+`skin.js` unchanged. Diff-check clean.
+
 ## 0.7.12 - 2026-05-14
 
 Full standalone recovery. Audit of yuna-innsight.php surfaced four

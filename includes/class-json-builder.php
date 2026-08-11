@@ -82,6 +82,7 @@ final class JsonBuilder {
                 // Client-name prefix (e.g. "Balmers"). Skin rewrites each
                 // .in-wordmark element to "<prefix> → Innsight." when set.
                 'wordmarkPrefix' => (string) ( $settings['wordmark_prefix'] ?? '' ),
+                'base'    => $this->build_base_config( $settings ),
             ),
             'actionLinks'  => $this->default_action_links(),
             'categories'   => $this->build_categories( $skin_name, $intermediate['pois'] ),
@@ -225,6 +226,42 @@ final class JsonBuilder {
          * @return string
          */
         return (string) apply_filters( 'innsight/visitor_country', $detected );
+    }
+
+    /**
+     * Base-marker branding block. Resolves the attachment ID to two
+     * live URLs (medium + thumbnail) so the pin template's srcset
+     * fires on retina; drops the whole block when the attachment is
+     * missing so a deleted media item never yields a broken image on
+     * the map. Rings is a plain int array; empty array hides the
+     * dashed circles altogether.
+     */
+    private function build_base_config( array $settings ): array {
+        $out = array();
+        $att = (int) ( $settings['base_photo'] ?? 0 );
+        if ( $att > 0 ) {
+            $medium = wp_get_attachment_image_url( $att, 'medium' );
+            $thumb  = wp_get_attachment_image_url( $att, 'thumbnail' );
+            if ( $medium && $thumb ) {
+                $post = get_post( $att );
+                $out['photo']      = (string) $medium;
+                $out['photoThumb'] = (string) $thumb;
+                $out['alt']        = $post ? (string) get_post_meta( $att, '_wp_attachment_image_alt', true ) ?: (string) $post->post_title : '';
+            }
+        }
+        $label = trim( (string) ( $settings['base_label'] ?? '' ) );
+        if ( $label !== '' ) $out['label'] = $label;
+
+        $rings = array();
+        $raw = trim( (string) ( $settings['base_rings'] ?? '' ) );
+        if ( $raw !== '' ) {
+            foreach ( preg_split( '/[,\s]+/', $raw ) as $n ) {
+                $n = (int) $n;
+                if ( $n > 0 && $n <= 120 ) $rings[] = $n;
+            }
+        }
+        $out['rings'] = array_values( array_unique( $rings ) );
+        return $out;
     }
 
     /**
