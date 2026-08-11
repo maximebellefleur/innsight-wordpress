@@ -257,6 +257,10 @@
         var self = this;
         var sourceId = 'innsight-base-rings';
         var METRES_PER_MIN = 80;
+        var MIN_ZOOM = 11;  // was 13 - too aggressive; visitors landing at zoom 10-12 saw nothing.
+        if (root.console && root.console.info) {
+            root.console.info('[innsight] walk rings around', lat.toFixed(4), lon.toFixed(4), '- minutes:', minutes, '- visible at zoom ≥', MIN_ZOOM);
+        }
 
         function metersToPolygon(centerLat, centerLon, radiusM, steps) {
             // Simple equirectangular projection - good enough at pedestrian
@@ -294,20 +298,24 @@
             if (self.native.getLayer('innsight-base-rings-line-out'))self.native.removeLayer('innsight-base-rings-line-out');
             if (self.native.getSource(sourceId))                     self.native.removeSource(sourceId);
             self.native.addSource(sourceId, { type: 'geojson', data: geojson });
-            // Fill on the innermost ring only.
+            // Fill on the innermost ring only. Bumped from 14% -> 24%
+            // so the accent tint is actually visible on the cream map
+            // background at zoom 11-13.
             self.native.addLayer({
                 id: 'innsight-base-rings-fill', type: 'fill', source: sourceId,
-                minzoom: 13,
+                minzoom: MIN_ZOOM,
                 filter: ['==', ['get', 'order'], 0],
-                paint: { 'fill-color': 'rgba(201,247,63,0.14)' }
+                paint: { 'fill-color': 'rgba(201,247,63,0.24)' }
             });
-            // Outer stroke (all rings).
+            // Outer stroke (all rings). Bumped from 2px @ 32% opacity
+            // to 3px @ 55% so the dashed circles read at first glance
+            // instead of blending into the map.
             self.native.addLayer({
                 id: 'innsight-base-rings-line-out', type: 'line', source: sourceId,
-                minzoom: 13,
+                minzoom: MIN_ZOOM,
                 paint: {
-                    'line-color': 'rgba(15,15,15,0.32)',
-                    'line-width': 2,
+                    'line-color': 'rgba(15,15,15,0.55)',
+                    'line-width': 3,
                     'line-dasharray': [3, 3]
                 }
             });
@@ -315,11 +323,11 @@
             // core reads a touch stronger than the "10 min" outer.
             self.native.addLayer({
                 id: 'innsight-base-rings-line-in', type: 'line', source: sourceId,
-                minzoom: 13,
+                minzoom: MIN_ZOOM,
                 filter: ['==', ['get', 'order'], 0],
                 paint: {
-                    'line-color': 'rgba(15,15,15,0.45)',
-                    'line-width': 2,
+                    'line-color': 'rgba(15,15,15,0.70)',
+                    'line-width': 3,
                     'line-dasharray': [3, 3]
                 }
             });
@@ -356,8 +364,8 @@
             // Show/hide chip in sync with the ring layers.
             var syncChip = function () {
                 var z = mapRef.getZoom();
-                if (z >= 13 && !m._addedToMap) { m.addTo(mapRef); m._addedToMap = true; }
-                else if (z < 13 && m._addedToMap) { m.remove(); m._addedToMap = false; }
+                if (z >= MIN_ZOOM && !m._addedToMap) { m.addTo(mapRef); m._addedToMap = true; }
+                else if (z < MIN_ZOOM && m._addedToMap) { m.remove(); m._addedToMap = false; }
             };
             syncChip();
             mapRef.on('zoom', syncChip);

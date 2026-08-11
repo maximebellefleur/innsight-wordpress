@@ -1,4 +1,22 @@
 # Changelog
+## 0.7.15 - 2026-05-14
+
+- **Luggage-tag pin flipped**: tag now sits on TOP; string dangles
+  DOWN and ends in the reinforced eyelet, which lands exactly on
+  the coordinate (Mapbox anchor is bottom, so bottom of wrapper =
+  lat/lon). Previously the eyelet was at the top of the wrapper,
+  floating uselessly above.
+- **Walk rings visibility**:
+  - `MIN_ZOOM` lowered from 13 → 11 so visitors landing at the
+    default city-scale zoom already see the circles.
+  - Line strokes bumped from `2px @ 32% opacity` → `3px @ 55%`
+    (outer) and `70%` (inner) so the dashed rings actually read
+    against the cream map.
+  - Inner-ring fill bumped from `14% accent` → `24% accent`.
+  - Chip visibility sync uses the new `MIN_ZOOM`.
+  - `console.info` on first render logs the base lat/lon + minutes
+    array so you can verify the call fired.
+
 ## 0.7.14 - 2026-05-14
 
 - **Install banner removed** from LegacyMisc. Was appearing even
