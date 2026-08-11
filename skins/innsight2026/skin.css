@@ -1364,12 +1364,14 @@ body.innsight-sheet-locked {
     text-decoration: none;
 }
 /* Icons throughout the strip: outline-only, muted grey, no fills.
- * Subtle enough to read as glyphs without competing with the text. */
+ * Bumped visibility in 0.7.14 - 35% opacity was too faint to read
+ * on the cream sheet background; now 60% with a slightly heavier
+ * stroke so the glyphs are legible without shouting. */
 .in-sheet__gicon {
-    color: rgba(15, 15, 15, 0.35) !important;
+    color: rgba(15, 15, 15, 0.60) !important;
     fill: none !important;
     flex-shrink: 0;
-    stroke-width: 1.2;
+    stroke-width: 1.5;
 }
 .in-sheet__gsep { color: var(--in-mute2); }
 
@@ -1483,9 +1485,9 @@ body.innsight-sheet-locked {
     gap: 2px;
 }
 .in-sheet__greview-rating svg {
-    color: rgba(15, 15, 15, 0.35);
+    color: rgba(15, 15, 15, 0.60);
     fill: none;
-    stroke-width: 1.2;
+    stroke-width: 1.5;
 }
 .in-sheet__greview-when { color: var(--in-mute2); font-size: 11px; margin-left: auto; }
 .in-sheet__greview-text {

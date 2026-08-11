@@ -1,4 +1,18 @@
 # Changelog
+## 0.7.14 - 2026-05-14
+
+- **Install banner removed** from LegacyMisc. Was appearing even
+  inside the installed PWA on some display modes (my
+  `matchMedia('(display-mode: standalone)')` + `navigator.standalone`
+  detection didn't cover every browser/OS combo). Nag popups fighting
+  the tab bar + BOOK NOW button are a net negative anyway. Native
+  browser install prompts (Chrome menu → Install app, iOS Share →
+  Add to Home Screen) do the same job cleanly.
+- **Sheet quick-info icon visibility bumped** — 35% opacity was too
+  faint to read on the cream sheet. Now 60% opacity + stroke-width
+  1.5 (was 1.2) so glyphs are legible without shouting. Same
+  outline-only, muted-grey palette; just readable now.
+
 ## 0.7.13 - 2026-05-14
 
 Map pin redesign for innsight2026 skin: luggage-tag POI pins + taped-photo

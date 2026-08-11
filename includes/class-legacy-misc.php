@@ -40,7 +40,11 @@ final class LegacyMisc {
         add_action( 'point_of_interest_edit_form_fields', array( $this, 'render_main_more_info_field' ), 20 );
         add_action( 'edited_point_of_interest',           array( $this, 'save_main_more_info_field' ) );
         add_filter( 'register_post_type_args',            array( $this, 'rename_portfolio_labels' ), 10, 2 );
-        add_action( 'wp_footer',                          array( $this, 'render_install_banner' ), 99 );
+        // Install banner removed in 0.7.14. Nag popups were showing
+        // even inside the PWA on some display modes. Native browser
+        // install prompts (Chrome menu > Install app, iOS Share >
+        // Add to Home Screen) do the same job without a footer bar
+        // fighting the tab bar and Book Now button.
     }
 
     private function legacy_active(): bool {
@@ -122,64 +126,4 @@ final class LegacyMisc {
         return $args;
     }
 
-    /* ─── 3. iOS / PWA install banner ────────────────────────────────────── */
-
-    /**
-     * Simple install banner: only prints on pages using our map
-     * template. Beforeinstallprompt on Android/Chrome fires our own
-     * install button; iOS Safari doesn't fire it, so we detect iOS
-     * separately and show a small "Add to Home Screen" hint pointing
-     * at the Share sheet.
-     *
-     * Dismissible; remembered in localStorage so returning visitors
-     * don't see it again after saying no.
-     */
-    public function render_install_banner(): void {
-        if ( $this->legacy_active() ) return;
-        if ( empty( innsight_settings( 'pwa_enabled', 1 ) ) ) return;
-        // Only render on pages that use the Innsight map template -
-        // other pages don't need the install nag.
-        if ( ! is_singular() ) return;
-        $slug = get_page_template_slug( get_queried_object_id() );
-        if ( strpos( (string) $slug, 'page-map.php' ) === false ) return;
-
-        $short = (string) ( innsight_settings( 'pwa_short_name', '' ) ) ?: (string) get_bloginfo( 'name' );
-        ?>
-<div id="innsight-install" hidden style="position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#0F0F0F;color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 22px rgba(0,0,0,.35);font:14px/1.35 system-ui">
-    <span style="flex:1"><strong><?php echo esc_html( $short ); ?></strong> — <span data-innsight-install-copy>add to your home screen</span></span>
-    <button type="button" id="innsight-install-btn" style="background:#C9F73F;color:#0F0F0F;border:0;border-radius:999px;padding:8px 14px;font-weight:600;cursor:pointer" hidden>Install</button>
-    <button type="button" id="innsight-install-close" aria-label="Dismiss" style="background:transparent;color:#fff;border:0;font-size:20px;cursor:pointer;padding:0 4px">×</button>
-</div>
-<script>
-(function(){
-    var el = document.getElementById('innsight-install');
-    if (!el) return;
-    var btn = document.getElementById('innsight-install-btn');
-    var close = document.getElementById('innsight-install-close');
-    var copy = el.querySelector('[data-innsight-install-copy]');
-    var STORAGE_KEY = 'innsight.installDismissed';
-    if (localStorage.getItem(STORAGE_KEY)) return;
-    var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (isStandalone) return;
-    var ua = window.navigator.userAgent.toLowerCase();
-    var isIos = /iphone|ipad|ipod/.test(ua) && !window.MSStream;
-    var deferredPrompt = null;
-    window.addEventListener('beforeinstallprompt', function(e){
-        e.preventDefault(); deferredPrompt = e;
-        el.hidden = false; btn.hidden = false;
-    });
-    btn.addEventListener('click', function(){
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(function(){ el.hidden = true; localStorage.setItem(STORAGE_KEY, '1'); });
-    });
-    close.addEventListener('click', function(){ el.hidden = true; localStorage.setItem(STORAGE_KEY, '1'); });
-    if (isIos) {
-        el.hidden = false; btn.hidden = true;
-        copy.innerHTML = 'tap <b style="font-size:16px">&#x2191;</b> then <b>Add to Home Screen</b>';
-    }
-})();
-</script>
-        <?php
-    }
 }
