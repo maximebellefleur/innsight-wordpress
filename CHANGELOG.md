@@ -1,4 +1,54 @@
 # Changelog
+## 0.7.9 - 2026-05-14
+
+Standalone-ready. Once you delete/deactivate the legacy `yuna-innsight`
+plugin, everything the admin editing UI needs stays wired up.
+
+### What was already covered
+
+- `point_of_interest` taxonomy re-registered by `LegacyCompat` at
+  init:11 when the legacy plugin isn't there.
+- `[custom_map]` shortcode registered as an alias next to
+  `[innsight_map]`, so existing embedded shortcodes keep working.
+- Site defaults (maps_titre / maps_latitude / maps_longitude /
+  maps_text / maps_bg_img / maps_more_info_url) editable via
+  Innsight → Map defaults.
+- `innsight_get_field()` reads through ACF when present, falls back
+  to raw options/postmeta/termmeta when not.
+- Stale yuna service-worker auto-unregistered.
+
+### What 0.7.9 adds
+
+- **New `LegacyAcf` service** registers the three ACF field groups
+  yuna-innsight used to own, verbatim (same keys so all existing meta
+  keeps resolving):
+  - **POI Fields** on `point_of_interest` terms: poi_latitude,
+    poi_longitude, distance_from_hostel_km, poi_type (select), 
+    poi_category (icon slug), poi_image, poi_url_link.
+  - **GENERAL FIELDS** on the `yuna_innsight` options page:
+    maps_bg_img, maps_titre, maps_text, maps_more_info_url,
+    maps_latitude, maps_longitude.
+  - **Maps Shortcode Fields** on `acts`/`event`/`post`/`page` (auto-
+    detected): map_to_post, map_base_location, map_zoom_level,
+    map_quick_name, maps_add_markers, maps_add_paths,
+    maps_existing_act_marker_id (repeater), maps_paths_box (repeater
+    with color + coord list).
+- **`yuna_innsight` options page re-registered as an Innsight
+  submenu** ("Site defaults") when ACF Pro is available so the
+  GENERAL FIELDS group has somewhere to render.
+- **Sentinel check**: skips both registrations when
+  `add_custom_map_shortcode()` still exists (= legacy plugin still
+  active), so no double-registration during a transitional install.
+
+### After you delete yuna-innsight
+
+1. Deactivate + delete `yuna-innsight` in Plugins.
+2. Reload any POI term edit page → the POI Fields metabox stays.
+3. Reload any post that used `[custom_map]` → the Maps Shortcode
+   Fields box stays.
+4. Innsight → Site defaults renders the GENERAL FIELDS options page.
+5. Every stored value survives because we reuse the same field keys.
+
 ## 0.7.8 - 2026-05-14
 
 - **`&amp;` in POI titles fixed.** WP's `get_the_title()` returns

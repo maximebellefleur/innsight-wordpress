@@ -61,6 +61,8 @@ final class Plugin {
     private $analytics_page;
     /** @var Places */
     private $places;
+    /** @var LegacyAcf */
+    private $legacy_acf;
     /** @var bool */
     private $booted = false;
 
@@ -94,6 +96,7 @@ final class Plugin {
         $this->places          = new Places();
         $this->rest_controller = new RestController( $this->data_source, $this->json_builder, $this->stats, $this->places );
         $this->analytics_page  = new AnalyticsPage( $this->stats );
+        $this->legacy_acf      = new LegacyAcf();
         $this->kml_export      = new KmlExport( $this->data_source );
         $this->admin           = new Admin();
         $this->poi_post_type   = new PoiPostType();
@@ -132,6 +135,7 @@ final class Plugin {
             'stats'           => $this->stats,
             'analytics_page'  => $this->analytics_page,
             'places'          => $this->places,
+            'legacy_acf'      => $this->legacy_acf,
         ), $this );
         foreach ( $services as $key => $svc ) {
             $this->{$key} = $svc;
@@ -150,6 +154,7 @@ final class Plugin {
         $this->assets->register();
         $this->cache_manager->register();
         $this->places->register();
+        $this->legacy_acf->register();
         if ( is_admin() ) {
             $this->admin->register();
             $this->defaults_page->register();
