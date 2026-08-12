@@ -269,6 +269,14 @@ final class JsonBuilder {
             }
         }
         $out['rings'] = array_values( array_unique( $rings ) );
+
+        // Explicit coordinates take priority over the POI-list scan.
+        $lat = (string) ( $settings['base_lat'] ?? '' );
+        $lon = (string) ( $settings['base_lon'] ?? '' );
+        if ( is_numeric( $lat ) && is_numeric( $lon ) ) {
+            $out['lat'] = (float) $lat;
+            $out['lon'] = (float) $lon;
+        }
         return $out;
     }
 

@@ -114,24 +114,36 @@
 
     /**
      * Resolve the POI that should be rendered as the "home base".
-     * Priority:
-     *   1. First POI with pinned === true
-     *   2. Else first POI with type/cat === 'hostel'
-     *   3. Else - if the admin has configured a Base photo / label /
-     *      rings in Settings AND the map has a valid center - a
-     *      SYNTHETIC POI at map.center. This is the "I set a base
-     *      photo but no POI was marked as the hostel" case; the
-     *      marker + rings still render at the map's centre so the
-     *      admin sees their config take effect.
-     *   4. Else null (no base marker at all).
+     * Priority (highest wins):
+     *   1. Explicit branding.base.lat/lon in Settings → synthetic POI
+     *      at those exact coords. This is the admin's escape hatch:
+     *      "put the base marker HERE, ignore the POI list."
+     *   2. First POI with pinned === true.
+     *   3. Else first POI with type/cat === 'hostel'.
+     *   4. Else - if the admin configured Base photo/label/rings AND
+     *      map.center is valid - a synthetic POI at map.center.
+     *   5. Else null (no base marker).
      */
     function pickBasePoi(pois, config) {
+        var b = (config && config.branding && config.branding.base) || {};
+        // Priority 1: explicit coords from Settings.
+        if (isFinite(b.lat) && isFinite(b.lon)) {
+            return {
+                id: '__innsight_base_synthetic',
+                title: b.label || 'Base',
+                lat: Number(b.lat),
+                lon: Number(b.lon),
+                type: 'hostel',
+                cat: 'hostel',
+                pinned: true,
+                __synthetic: true
+            };
+        }
         for (var i = 0; i < pois.length; i++) if (pois[i].pinned) return pois[i];
         for (var j = 0; j < pois.length; j++) {
             if (pois[j].type === 'hostel' || pois[j].cat === 'hostel') return pois[j];
         }
         // Fallback: use map.center as anchor when Base settings exist.
-        var b = (config && config.branding && config.branding.base) || {};
         var hasBaseConfig = !!(b.photo || b.label || (b.rings && b.rings.length));
         var c = config && config.map && config.map.center;
         if (hasBaseConfig && c && isFinite(c.lat) && isFinite(c.lon)) {

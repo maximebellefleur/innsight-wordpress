@@ -1,4 +1,19 @@
 # Changelog
+## 0.7.20 - 2026-05-14
+
+- **Base latitude / longitude fields in Settings → Design**. Direct
+  admin escape hatch: type the coords for your base (e.g.
+  `46.6822` / `7.8585` for Balmers) and the marker + walk rings
+  anchor there regardless of what's in the POI list. Overrides the
+  pinned/hostel/map-center resolution chain. Empty falls through to
+  the previous priority order.
+- `pickBasePoi()` priority chain now:
+  1. `branding.base.lat/lon` (Settings) ← NEW top priority
+  2. First POI with `pinned:true`
+  3. First POI with `type/cat === 'hostel'`
+  4. `map.center` fallback when Base config exists
+  5. Null (no base)
+
 ## 0.7.19 - 2026-05-14
 
 - **Distinct hike / activities / land icons** (were nearly identical

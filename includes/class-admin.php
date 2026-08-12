@@ -99,6 +99,8 @@ final class Admin {
         $this->add_field( 'base_photo',     __( 'Base photo', 'innsight' ),        'innsight_design', 'render_attachment', __( 'Photo of the hostel / base location. Shown on the map as a taped-photo print above the base pin. Empty = striped placeholder.', 'innsight' ) );
         $this->add_field( 'base_label',     __( 'Base label', 'innsight' ),        'innsight_design', 'render_text',       __( 'Caption on the base marker (e.g. "Balmers"). Empty falls back to the wordmark prefix, then to the POI title.', 'innsight' ) );
         $this->add_field( 'base_rings',     __( 'Walk-time rings (min)', 'innsight' ), 'innsight_design', 'render_text',   __( 'Comma-separated minutes for the dashed circles around the base (e.g. "5,10"). 80 m / walking minute. Empty = no rings.', 'innsight' ) );
+        $this->add_field( 'base_lat',       __( 'Base latitude',  'innsight' ), 'innsight_design', 'render_text', __( 'Decimal degrees (e.g. 46.6822 for Balmers Hostel). Overrides the pinned/hostel POI + map-center fallback. Leave empty to auto-detect from the POI list.', 'innsight' ) );
+        $this->add_field( 'base_lon',       __( 'Base longitude', 'innsight' ), 'innsight_design', 'render_text', __( 'Decimal degrees (e.g. 7.8585 for Balmers Hostel). Overrides the pinned/hostel POI + map-center fallback.', 'innsight' ) );
 
         $this->add_field( 'provider_default', __( 'Default provider', 'innsight' ), 'innsight_provider', 'render_provider_default' );
         $this->add_field( 'mapbox_access_token', __( 'Mapbox access token', 'innsight' ), 'innsight_provider', 'render_text' );

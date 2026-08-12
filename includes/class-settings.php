@@ -101,6 +101,12 @@ final class Settings {
             'base_photo'           => 0,
             'base_label'           => '',
             'base_rings'           => '5,10',
+            // Explicit base coordinates. When set, override the
+            // pinned/hostel-POI resolution AND the map.center fallback.
+            // Empty = fall through to the priority chain in
+            // engine/features/markers.js#pickBasePoi.
+            'base_lat'             => '',
+            'base_lon'             => '',
 
             // Share-wishlist feature (innsight2026 only). When enabled, the
             // Saved tab gets a top-right Share button that lets the visitor
@@ -207,6 +213,14 @@ final class Settings {
         $rings_raw = isset( $raw['base_rings'] ) ? (string) $raw['base_rings'] : '';
         $rings = array_filter( array_map( 'intval', preg_split( '/[,\s]+/', trim( $rings_raw ) ) ), function ( $n ) { return $n > 0 && $n <= 120; } );
         $clean['base_rings']           = implode( ',', array_slice( array_values( array_unique( $rings ) ), 0, 4 ) );
+
+        // Base coordinates - kept as strings so an empty value stays
+        // truly empty (not 0.0 which would silently anchor at null-
+        // island in the Atlantic). Validation happens on read.
+        foreach ( array( 'base_lat', 'base_lon' ) as $ck ) {
+            $v = isset( $raw[ $ck ] ) ? trim( (string) $raw[ $ck ] ) : '';
+            $clean[ $ck ] = is_numeric( $v ) ? $v : '';
+        }
 
         // Share-wishlist copy. Plain-text fields the recipient sees in the
         // receive popup + the dancing chip label. Stripped to avoid HTML
