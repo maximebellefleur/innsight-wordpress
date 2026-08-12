@@ -112,6 +112,28 @@ final class Assets {
         }
         wp_enqueue_style( self::HANDLE_SKIN_CSS );
 
+        // Inline @font-face with ABSOLUTE URLs. Relative URLs inside the
+        // bundled skin.css break the moment any CSS-optimiser plugin
+        // (Autoptimize, WP Rocket, LiteSpeed, Perfmatters, ...) moves
+        // skin.css into /wp-content/cache/... - the fonts then resolve
+        // under the cache directory and 404, and the ligature text
+        // ("restaurant", "hiking", ...) renders as plain text in every
+        // pin. Emitting the @font-face here with absolute URLs sidesteps
+        // that class of failure regardless of the optimiser.
+        if ( $skin === 'innsight2026' ) {
+            $fonts_url = INNSIGHT_URL . 'skins/' . $skin . '/assets/fonts/';
+            $font_face = sprintf(
+                '@font-face{font-family:"Innsight Material Icons";font-style:normal;font-weight:400;font-display:block;'
+                . 'src:url(%1$sMaterialIcons.woff2) format("woff2"),'
+                . 'url(%1$sMaterialIcons.woff) format("woff"),'
+                . 'url(%1$sMaterialIcons.ttf) format("truetype")}'
+                . '@font-face{font-family:"Innsight Map Icons";font-style:normal;font-weight:400;font-display:block;'
+                . 'src:url(%1$smap.ttf) format("truetype")}',
+                esc_url( $fonts_url )
+            );
+            wp_add_inline_style( self::HANDLE_SKIN_CSS, $font_face );
+        }
+
         // Re-enqueue every engine module handle so they all print.
         wp_enqueue_script( self::HANDLE_LEAFLET );
         wp_enqueue_script( self::HANDLE_MARKERCLUSTER );

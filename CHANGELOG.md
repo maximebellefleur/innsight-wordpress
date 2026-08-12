@@ -1,4 +1,23 @@
 # Changelog
+## 0.7.24 - 2026-08-12
+
+- **Icon-font @font-face now uses absolute URLs.** The relative
+  `url('assets/fonts/MaterialIcons.woff2')` in `skin.css` breaks the
+  moment any CSS-optimiser plugin (Autoptimize, WP Rocket, LiteSpeed
+  Cache, Perfmatters, ...) moves `skin.css` into `/wp-content/cache/...`
+  — the relative path then resolves under the cache directory and 404s,
+  so the browser falls back to `sans-serif` and renders the ligature
+  text ("restaurant", "hiking") as plain text in every pin. Fixed by
+  emitting the `@font-face` inline via `wp_add_inline_style` in
+  `class-assets.php` with absolute plugin URLs. The relative version
+  stays in `skin.css` as a fallback for standalone / non-WP uses.
+- **Glyph CSS hardened with `!important`** on font-family, size,
+  line-height, letter-spacing, text-transform, and ligature settings
+  so no theme override can shadow it. Added `font-variant-ligatures`
+  explicitly. Unknown-category pins (no `--md` or `--map` modifier)
+  hide their text via `font-size:0` so nothing leaks if the fontClass
+  is blank.
+
 ## 0.7.23 - 2026-08-12
 
 - **Base marker + walk rings actually render now** (the fix in 0.7.21
