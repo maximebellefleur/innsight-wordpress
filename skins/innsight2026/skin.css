@@ -33,6 +33,28 @@
     --in-font-ui:      'Bricolage Grotesque', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* ── Icon fonts ──────────────────────────────────────────────────────────── */
+/* Bundled here (not fetched from an external CDN) so pins render even on
+ * offline PWA visits and even when the host theme doesn't ship Materialize.
+ * Namespaced with the 'Innsight ' prefix so a theme's own Material Icons
+ * stylesheet loaded on the same page can't shadow ours. */
+@font-face {
+    font-family: 'Innsight Material Icons';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('assets/fonts/MaterialIcons.woff2') format('woff2'),
+         url('assets/fonts/MaterialIcons.woff')  format('woff'),
+         url('assets/fonts/MaterialIcons.ttf')   format('truetype');
+}
+@font-face {
+    font-family: 'Innsight Map Icons';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('assets/fonts/map.ttf') format('truetype');
+}
+
 /* ── Reset / app frame ───────────────────────────────────────────────────── */
 /* .in-app fills 100% of the shortcode container (.innsight-map-target,
  * which gets its height from the shortcode's `height` attribute - 70vh
@@ -413,17 +435,35 @@
     color: var(--in-ink);
 }
 .in-pin__icon svg { display: block; }
-/* Icon-font glyph in the pin's right-hand slot. The host page already
-   loads Materialize (md-*) and Map Icons (map-*), so we just size the
-   glyph to fit the 24px slot. line-height:1 keeps it optically centred;
-   font-style:normal wins against Materialize's occasional italic override. */
+/* Icon-font glyph in the pin's right-hand slot. Two families are
+   bundled via @font-face at the top of this file: 'Innsight Material
+   Icons' (Google Material Icons) and 'Innsight Map Icons' (Scott de
+   Jonge's Map Icons). We prefix both names with 'Innsight' so a
+   host page's own Material Icons stylesheet can't accidentally win
+   the cascade. The pin renders `<i class="in-pin__glyph in-pin__glyph--md">restaurant</i>`
+   — the ligature text inside is the actual glyph name; the font
+   swaps it for the matching icon. Works for every md-* / map-*
+   category the legacy yuna schema uses. */
 .in-pin__glyph {
     font-size: 14px;
     line-height: 1;
     color: var(--in-ink);
     font-style: normal;
+    font-weight: normal;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
     display: inline-block;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
+.in-pin__glyph--md  { font-family: 'Innsight Material Icons', 'Material Icons', sans-serif; }
+.in-pin__glyph--map { font-family: 'Innsight Map Icons', 'Map Icons', sans-serif; }
 .in-pin__string {
     position: absolute;
     bottom: 6px; left: 50%;

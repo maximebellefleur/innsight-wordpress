@@ -1,4 +1,35 @@
 # Changelog
+## 0.7.23 - 2026-08-12
+
+- **Base marker + walk rings actually render now** (the fix in 0.7.21
+  was only half the fix). The 0.7.21 patch added `base` to the JS
+  skin-loader's partKeys, but on WordPress the shortcode inlines
+  partials via `window.INNSIGHT_SKIN_PARTIALS` and never fetches —
+  so the inline path in `class-skin-partials.php` had to include
+  `base` too, and it didn't. `SkinPartials::read()` now slurps
+  `base.html` (also added to `$watched` so its filemtime busts the
+  transient cache). Result: `partials.base` is non-empty →
+  `pickBasePoi()` runs → base marker + walk rings both draw.
+- **Pin icon glyphs bundled + rendered via ligatures.** Copied
+  MaterialIcons.woff2/woff/ttf + map.ttf from the solike2025 skin
+  into `skins/innsight2026/assets/fonts/`. Added `@font-face` for
+  'Innsight Material Icons' and 'Innsight Map Icons' (namespaced
+  so a host theme's own Material Icons stylesheet can't shadow
+  ours). `pin.html` now renders
+  `<i class="in-pin__glyph {{iconFontClass}}">{{iconLigature}}</i>`.
+  `iconMetaForPoi()` in `engine/features/markers.js` splits
+  `poi.category` into the font-family class + ligature text:
+    `md-restaurant`     → `in-pin__glyph--md`  + `restaurant`
+    `md-local-cafe`     → `in-pin__glyph--md`  + `local_cafe`
+    `map-swimming`      → `in-pin__glyph--map` + `swimming`
+    `map-natural-feature` → `in-pin__glyph--map` + `natural-feature`
+    unknown / fa-*      → no glyph (letter tile carries the pin)
+- Files: `includes/class-skin-partials.php`,
+  `engine/features/markers.js`,
+  `skins/innsight2026/pin.html`,
+  `skins/innsight2026/skin.css`,
+  `skins/innsight2026/assets/fonts/*` (new).
+
 ## 0.7.22 - 2026-08-12
 
 - **Pin colour = filter chip colour.** The chip dots use each

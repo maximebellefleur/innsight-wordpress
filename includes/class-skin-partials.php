@@ -48,7 +48,7 @@ final class SkinPartials {
         // even though the on-disk files are new. With the version in the
         // key, every release forces a fresh cache entry guaranteed.
         $signature = (string) filemtime( $manifest_path );
-        $watched = array( 'layout.html', 'popup.html', 'cluster.html', 'pin.html', 'sheet.html', 'list-row.html', 'list-item.html', 'empty-state.html', 'skin.css', 'skin.js' );
+        $watched = array( 'layout.html', 'popup.html', 'cluster.html', 'pin.html', 'base.html', 'sheet.html', 'list-row.html', 'list-item.html', 'empty-state.html', 'skin.css', 'skin.js' );
         foreach ( $watched as $f ) {
             if ( is_readable( $base . $f ) ) {
                 $signature .= '|' . filemtime( $base . $f );
@@ -72,6 +72,7 @@ final class SkinPartials {
             'popup'      => $this->slurp( $base, $files['popup']      ?? null ),
             'cluster'    => $this->slurp( $base, $files['cluster']    ?? null ),
             'pin'        => $this->slurp( $base, $files['pin']        ?? null ),
+            'base'       => $this->slurp( $base, $files['base']       ?? null ),
             'sheet'      => $this->slurp( $base, $files['sheet']      ?? null ),
             'listRow'    => $this->slurp( $base, $files['listRow']    ?? null ),
             'listItem'   => $this->slurp( $base, $files['listItem']   ?? null ),

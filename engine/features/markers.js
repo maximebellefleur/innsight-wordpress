@@ -72,6 +72,35 @@
     }
 
     /**
+     * Derive the font family + ligature text for a POI's icon-font
+     * glyph. Legacy yuna categories carry the font in the class name
+     * prefix:
+     *   md-restaurant     → Material Icons, ligature "restaurant"
+     *   md-local-cafe     → Material Icons, ligature "local_cafe" (hyphen→underscore)
+     *   map-swimming      → Map Icons,     ligature "swimming"
+     *   map-natural-feature → Map Icons,   ligature "natural-feature"
+     *   fa-food / <blank> → no glyph (letter tile carries the pin)
+     * The skin's pin template renders <i class="{{iconFontClass}}">{{iconLigature}}</i>;
+     * the browser picks the glyph from the font's ligature table.
+     */
+    function iconMetaForPoi(poi) {
+        var cat = String(poi.category || '').trim();
+        if (cat.indexOf('md-') === 0) {
+            return {
+                fontClass: 'in-pin__glyph--md',
+                ligature: cat.slice(3).replace(/-/g, '_')
+            };
+        }
+        if (cat.indexOf('map-') === 0) {
+            return {
+                fontClass: 'in-pin__glyph--map',
+                ligature: cat.slice(4)
+            };
+        }
+        return { fontClass: '', ligature: '' };
+    }
+
+    /**
      * Colour for the POI, sourced from the same categories list the
      * filter chips render. Guarantees the pin's letter tile matches
      * the colour of its filter chip's dot — same input, same lookup.
@@ -197,16 +226,17 @@
         for (var k in poi) if (Object.prototype.hasOwnProperty.call(poi, k)) ctx[k] = poi[k];
         ctx.initial = (poi.title || poi.name || '·').charAt(0).toUpperCase();
         ctx.stickerColor = color;
-        // Icon font class for the pin's right-hand slot. The host page
-        // already loads Materialize (md-*) + Map Icons (map-*), so a
-        // POI whose `category` is e.g. "md-restaurant" or "map-swimming"
-        // becomes a real font glyph. Falls back to "fa-<type>" for POIs
-        // that don't set a category (mirrors the legacy yuna-innsight
-        // rule).
+        // Legacy poi.category shape: "md-restaurant" / "map-swimming" /
+        // "fa-food". iconMetaForPoi splits it into the font-family class
+        // + the ligature text that the font maps to a glyph.
+        var meta = iconMetaForPoi(poi);
+        ctx.iconFontClass = meta.fontClass;
+        ctx.iconLigature  = meta.ligature;
+        // Kept for downstream skins still on the older class-based
+        // template (`<i class="{{iconClass}}">`) or the inline-SVG
+        // fallback (`{{{iconSvg}}}`).
         ctx.iconClass = resolveIconClass(poi);
-        // Inline SVG kept for downstream skins that opted into it via
-        // {{{iconSvg}}}. innsight2026 no longer uses it.
-        ctx.iconSvg = iconSvgForPoi(poi);
+        ctx.iconSvg   = iconSvgForPoi(poi);
         return ctx;
     }
 
