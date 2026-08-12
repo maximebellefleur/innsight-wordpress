@@ -298,37 +298,35 @@
             if (self.native.getLayer('innsight-base-rings-line-out'))self.native.removeLayer('innsight-base-rings-line-out');
             if (self.native.getSource(sourceId))                     self.native.removeSource(sourceId);
             self.native.addSource(sourceId, { type: 'geojson', data: geojson });
-            // Fill on the innermost ring only. Bumped from 14% -> 24%
-            // so the accent tint is actually visible on the cream map
-            // background at zoom 11-13.
+            // Inner ring fill - accent tint at 32% for a subtle
+            // "reachable zone" feel that reads at first glance.
             self.native.addLayer({
                 id: 'innsight-base-rings-fill', type: 'fill', source: sourceId,
                 minzoom: MIN_ZOOM,
                 filter: ['==', ['get', 'order'], 0],
-                paint: { 'fill-color': 'rgba(201,247,63,0.24)' }
+                paint: { 'fill-color': 'rgba(201,247,63,0.32)' }
             });
-            // Outer stroke (all rings). Bumped from 2px @ 32% opacity
-            // to 3px @ 55% so the dashed circles read at first glance
-            // instead of blending into the map.
+            // Outer stroke - solid ink line, 3.5px, no dash. Reads as
+            // a real boundary on the map instead of a suggestion.
             self.native.addLayer({
                 id: 'innsight-base-rings-line-out', type: 'line', source: sourceId,
                 minzoom: MIN_ZOOM,
                 paint: {
-                    'line-color': 'rgba(15,15,15,0.55)',
-                    'line-width': 3,
-                    'line-dasharray': [3, 3]
+                    'line-color': 'rgba(15,15,15,0.85)',
+                    'line-width': 3.5,
+                    'line-dasharray': [1, 0]
                 }
             });
-            // Inner stroke (innermost only) - darker, so the "5 min"
-            // core reads a touch stronger than the "10 min" outer.
+            // Inner stroke on the innermost ring - dashed accent so the
+            // 5-min core reads distinctly from the outer boundary.
             self.native.addLayer({
                 id: 'innsight-base-rings-line-in', type: 'line', source: sourceId,
                 minzoom: MIN_ZOOM,
                 filter: ['==', ['get', 'order'], 0],
                 paint: {
-                    'line-color': 'rgba(15,15,15,0.70)',
+                    'line-color': 'rgba(15,15,15,1)',
                     'line-width': 3,
-                    'line-dasharray': [3, 3]
+                    'line-dasharray': [4, 3]
                 }
             });
         };

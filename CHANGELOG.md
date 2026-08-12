@@ -1,4 +1,57 @@
 # Changelog
+## 0.7.16 - 2026-05-14
+
+Three fixes on the map layer:
+
+### Two-slot luggage tag pin with category icon
+
+Pin rewritten as a horizontal tag divided into two slots:
+- **Left**: colored slot with the POI's initial letter, striped
+  diagonal pattern in white at 22% opacity for the artisan feel.
+- **Right**: white slot with an inline-SVG category glyph tinted
+  to `--in-ink`.
+
+`markers.js` gained a tiny inline-SVG icon library (fresh clean
+monoline glyphs — no old fonts, no external dependencies) keyed on
+the normalised POI type:
+- food/eats → fork + knife
+- bar/drinks → cocktail glass
+- hike/activities → mountain triangle
+- transport → bus
+- shop/shops → shopping bag
+- hostel → house
+- place → pin
+- city → skyline
+- sights → eye
+- land → hills
+- public → building
+- event/events → calendar
+- Fallback: neutral dot
+
+Rendered via `{{{iconSvg}}}` (raw) in the pin template.
+
+### Base photo more robust
+
+`JsonBuilder::build_base_config` used to require BOTH the `medium`
+AND `thumbnail` sizes to resolve, or it dropped the whole photo key.
+For attachments smaller than 300 px OR sites that never registered
+those intermediate sizes, this yielded no photo even though the
+admin had uploaded one — the base marker fell back to the striped
+placeholder. Now: try medium → fall back to full; try thumbnail
+→ fall back to medium/full. Any resolvable URL means the photo
+renders.
+
+### Walk rings visible for real
+
+Bumped from subtle to prominent:
+- Fill: `14% accent` → `32% accent`
+- Outer stroke: `2px @ 32% opacity dashed` → **`3.5px @ 85% solid`**
+  (reads as a real boundary line)
+- Inner stroke: `2px @ 45% dashed` → **`3px @ 100% dashed`**
+  (crisp 4-3 dash pattern)
+
+Plus `console.info('[innsight] base POI: … | branding.base: … | has photo: true/false')` on every build so it's obvious when the config is missing the photo you uploaded.
+
 ## 0.7.15 - 2026-05-14
 
 - **Luggage-tag pin flipped**: tag now sits on TOP; string dangles

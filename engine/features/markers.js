@@ -18,6 +18,41 @@
         return 'fa-' + (poi.type || 'place');
     }
 
+    /**
+     * Tiny inline-SVG icon library for the pin's right-hand slot.
+     * Keyed on the normalised POI type (or category alias). Simple
+     * monoline glyphs in currentColor so CSS can tint them uniformly
+     * with the ink colour. Falls back to a dot when the type is
+     * unknown. Deliberately small (14x14) - the icon slot is only
+     * ~22px wide.
+     */
+    var TYPE_SVGS = {
+        food:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 1v5.5A1 1 0 0 0 5 7.5v5M4 1V4M4 1L3 4V6M4 4H3M9.5 1v5c0 .5-.3 1-1 1v5.5M9.5 1c1 .5 1.5 2 1.5 3.5 0 1-.5 2-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        eats:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 1v5.5A1 1 0 0 0 5 7.5v5M4 1V4M4 1L3 4V6M4 4H3M9.5 1v5c0 .5-.3 1-1 1v5.5M9.5 1c1 .5 1.5 2 1.5 3.5 0 1-.5 2-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        bar:        '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2h10L8 7v4M4 11h6M8 7v0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        drinks:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2h10L8 7v4M4 11h6M8 7v0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        hike:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 11.5L5.5 5l2.5 4 2-3 2.5 5.5H1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.7" cy="3" r=".9" fill="currentColor"/></svg>',
+        activities: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 11.5L5.5 5l2.5 4 2-3 2.5 5.5H1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+        transport:  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="2.5" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8h9M4 9.5v2M10 9.5v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="4.5" cy="6.5" r=".7" fill="currentColor"/><circle cx="9.5" cy="6.5" r=".7" fill="currentColor"/></svg>',
+        shop:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5h9l-.7 7.5H3.2l-.7-7.5zM5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        shops:      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5h9l-.7 7.5H3.2l-.7-7.5zM5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        hostel:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V6l5-3.5L12 6v6M5.5 12V8h3v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        place:      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1.5c-2.2 0-4 1.7-4 3.9C3 8.4 7 12.5 7 12.5s4-4.1 4-7.1c0-2.2-1.8-3.9-4-3.9z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="7" cy="5.3" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>',
+        city:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V5l3-2 3 2v7M8 12V7l3-2v7M2 12h10M4 7h1M4 9h1M9.5 8v1M9.5 10v1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        sights:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 7s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>',
+        land:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 11l3-6 2 3 2.5-5 4.5 8H1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+        public:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V6h10v6M2 6l5-4 5 4M6 12V9h2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        event:      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="3" width="9" height="8.5" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 5.5h9M4.5 2v2M9.5 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+        events:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="3" width="9" height="8.5" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 5.5h9M4.5 2v2M9.5 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+        // Fallback - a neutral dot when the type isn't in the library.
+        _default:   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="2" fill="currentColor"/></svg>'
+    };
+
+    function iconSvgForPoi(poi) {
+        var key = (poi.type || poi.cat || '').toLowerCase();
+        return TYPE_SVGS[key] || TYPE_SVGS._default;
+    }
+
     function buildIconHtml(poi, partials, config, isBase) {
         // Skin can supply a per-pin template (the 'pin' partial). If present,
         // it owns the entire marker DOM - the engine no longer wraps the icon
@@ -94,6 +129,10 @@
         for (var k in poi) if (Object.prototype.hasOwnProperty.call(poi, k)) ctx[k] = poi[k];
         ctx.initial = (poi.title || poi.name || '·').charAt(0).toUpperCase();
         ctx.stickerColor = color;
+        // Inline SVG for the pin's right-hand icon slot. Mapped from the
+        // POI's normalised `type` (falls back to a neutral dot when the
+        // type isn't in the library).
+        ctx.iconSvg = iconSvgForPoi(poi);
         return ctx;
     }
 
@@ -109,6 +148,14 @@
         // instead of pin.html, non-interactive, and pushed to a special
         // group so filters can't hide it.
         var basePoi = partials.base ? pickBasePoi(config.pois) : null;
+        // Debug: log whether the base was found + what branding.base
+        // carries, so it's obvious when the admin uploaded a photo in
+        // Settings but it never made it into the JSON config.
+        if (typeof console !== 'undefined' && console.info) {
+            var b = (config.branding && config.branding.base) || {};
+            console.info('[innsight] base POI:', basePoi ? (basePoi.id + ' (' + basePoi.title + ')') : 'none',
+                '| branding.base:', b, '| has photo:', !!b.photo);
+        }
 
         config.pois.forEach(function (poi) {
             var isBase = basePoi && poi === basePoi;

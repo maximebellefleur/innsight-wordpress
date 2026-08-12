@@ -359,13 +359,16 @@
     background: transparent;
     will-change: transform;
 }
-/* Luggage-tag pin. The tag hangs at the TOP; a short string dangles
- * DOWN from the tag's underside, ending in a reinforced eyelet that
- * sits exactly on the coordinate. Mapbox anchor is 'bottom', so the
- * eyelet lands on the lat/lon and the tag floats above like a chip. */
+/* Luggage-tag pin - two-slot layout.
+ *   [ striped colored letter | white icon ]
+ *              |
+ *              string
+ *              o    <- eyelet on the coordinate
+ * Mapbox anchor is 'bottom' so the eyelet's bottom sits ON the lat/lon
+ * and the tag floats above. Rotated -3° for a hand-tagged feel. */
 .in-pin {
     position: relative;
-    width: 44px; height: 56px;
+    width: 60px; height: 52px;
     animation: in-pin-pop 0.55s cubic-bezier(.5, 1.6, .4, 1) both;
     transform-origin: 50% 100%;
     overflow: visible;
@@ -373,23 +376,50 @@
 .in-pin__tag {
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 40px;
-    padding: 3px;
+    height: 32px;
     background: #fff;
     border: 1.5px solid var(--in-ink);
     border-radius: 8px;
     box-shadow: 2px 3px 0 rgba(15, 15, 15, 0.85);
-    transform: rotate(-4deg);
+    display: flex;
+    overflow: hidden;
+    transform: rotate(-3deg);
     transform-origin: 50% 100%;
     z-index: 3;
 }
+.in-pin__letter {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 30px;
+    background: var(--c, #FFB85C);
+    background-image: repeating-linear-gradient(135deg,
+        rgba(255, 255, 255, 0.22) 0 4px,
+        transparent 4px 8px);
+    display: flex; align-items: center; justify-content: center;
+    border-right: 1.5px solid var(--in-ink);
+}
+.in-pin__letter-glyph {
+    font-family: var(--in-font-display);
+    font-style: italic;
+    font-size: 18px;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.in-pin__icon {
+    flex: 0 0 24px;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--in-ink);
+}
+.in-pin__icon svg { display: block; }
 .in-pin__string {
     position: absolute;
     bottom: 6px; left: 50%;
     width: 1.5px; height: 12px;
     margin-left: -0.75px;
     background: var(--in-ink);
-    opacity: 0.7;
+    opacity: 0.75;
     z-index: 2;
 }
 .in-pin__hole {
@@ -401,37 +431,6 @@
     background: #fff;
     border: 1.5px solid var(--in-ink);
     z-index: 3;
-}
-.in-pin__slot {
-    position: relative;
-    width: 100%; height: 100%;
-    border-radius: 5px;
-    overflow: hidden;
-    background: var(--c, #FFB85C);
-}
-.in-pin__img {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    filter: saturate(0.15) contrast(1.15) brightness(1.05);
-    mix-blend-mode: hard-light;
-    opacity: 0.95;
-}
-.in-pin__wash {
-    position: absolute; inset: 0;
-    background: var(--c, #FFB85C);
-    mix-blend-mode: multiply;
-    opacity: 0.55;
-}
-.in-pin__initial {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--in-font-display);
-    font-style: italic;
-    font-size: 22px;
-    color: #fff;
-    line-height: 1;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
 }
 
 /* ── Bottom sheet ────────────────────────────────────────────────────────── */

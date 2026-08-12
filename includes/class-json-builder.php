@@ -240,13 +240,21 @@ final class JsonBuilder {
         $out = array();
         $att = (int) ( $settings['base_photo'] ?? 0 );
         if ( $att > 0 ) {
+            // Try medium + thumbnail; fall back to full so a small
+            // upload (< 300 px, no intermediate sizes registered)
+            // still resolves to SOMETHING instead of dropping the
+            // whole key. Both slots default to whichever URL we
+            // managed to get so the <img srcset> works.
             $medium = wp_get_attachment_image_url( $att, 'medium' );
             $thumb  = wp_get_attachment_image_url( $att, 'thumbnail' );
-            if ( $medium && $thumb ) {
+            $full   = wp_get_attachment_url( $att );
+            $medium_url = $medium ?: $full ?: '';
+            $thumb_url  = $thumb  ?: $medium_url;
+            if ( $medium_url !== '' ) {
                 $post = get_post( $att );
-                $out['photo']      = (string) $medium;
-                $out['photoThumb'] = (string) $thumb;
-                $out['alt']        = $post ? (string) get_post_meta( $att, '_wp_attachment_image_alt', true ) ?: (string) $post->post_title : '';
+                $out['photo']      = (string) $medium_url;
+                $out['photoThumb'] = (string) $thumb_url;
+                $out['alt']        = $post ? ( (string) get_post_meta( $att, '_wp_attachment_image_alt', true ) ?: (string) $post->post_title ) : '';
             }
         }
         $label = trim( (string) ( $settings['base_label'] ?? '' ) );
