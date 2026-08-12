@@ -413,6 +413,17 @@
     color: var(--in-ink);
 }
 .in-pin__icon svg { display: block; }
+/* Icon-font glyph in the pin's right-hand slot. The host page already
+   loads Materialize (md-*) and Map Icons (map-*), so we just size the
+   glyph to fit the 24px slot. line-height:1 keeps it optically centred;
+   font-style:normal wins against Materialize's occasional italic override. */
+.in-pin__glyph {
+    font-size: 14px;
+    line-height: 1;
+    color: var(--in-ink);
+    font-style: normal;
+    display: inline-block;
+}
 .in-pin__string {
     position: absolute;
     bottom: 6px; left: 50%;

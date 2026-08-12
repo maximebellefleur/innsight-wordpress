@@ -37,6 +37,7 @@
             popup:     p.popup     || '',
             cluster:   p.cluster   || '',
             pin:       p.pin       || '',
+            base:      p.base      || '',
             sheet:     p.sheet     || '',
             listRow:   p.listRow   || p.listItem || '',
             listItem:  p.listItem  || '',
@@ -53,7 +54,7 @@
             if (manifest.files && manifest.files.css) injectStylesheet(base + manifest.files.css);
 
             var files = manifest.files || {};
-            var partKeys = ['layout', 'popup', 'cluster', 'pin', 'sheet', 'listRow', 'listItem', 'emptyState'];
+            var partKeys = ['layout', 'popup', 'cluster', 'pin', 'base', 'sheet', 'listRow', 'listItem', 'emptyState'];
             var jobs = partKeys.map(function (key) {
                 var fname = files[key];
                 return fname ? fetchText(base + fname).then(function (t) { return [key, t]; })

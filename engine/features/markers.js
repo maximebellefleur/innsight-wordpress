@@ -179,9 +179,15 @@
         for (var k in poi) if (Object.prototype.hasOwnProperty.call(poi, k)) ctx[k] = poi[k];
         ctx.initial = (poi.title || poi.name || '·').charAt(0).toUpperCase();
         ctx.stickerColor = color;
-        // Inline SVG for the pin's right-hand icon slot. Mapped from the
-        // POI's normalised `type` (falls back to a neutral dot when the
-        // type isn't in the library).
+        // Icon font class for the pin's right-hand slot. The host page
+        // already loads Materialize (md-*) + Map Icons (map-*), so a
+        // POI whose `category` is e.g. "md-restaurant" or "map-swimming"
+        // becomes a real font glyph. Falls back to "fa-<type>" for POIs
+        // that don't set a category (mirrors the legacy yuna-innsight
+        // rule).
+        ctx.iconClass = resolveIconClass(poi);
+        // Inline SVG kept for downstream skins that opted into it via
+        // {{{iconSvg}}}. innsight2026 no longer uses it.
         ctx.iconSvg = iconSvgForPoi(poi);
         return ctx;
     }

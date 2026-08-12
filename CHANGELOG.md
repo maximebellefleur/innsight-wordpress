@@ -1,4 +1,27 @@
 # Changelog
+## 0.7.21 - 2026-08-12
+
+- **Walk rings + base marker now actually render.** Root cause: the
+  skin loader's `partKeys` array in `engine/core/skin-loader.js` never
+  listed `base`, so `partials.base` was always `undefined` — which
+  short-circuited `pickBasePoi()` (guarded by
+  `partials.base ? pickBasePoi(...) : null`), which in turn skipped
+  the ring draw. `skin.json` had `base: "base.html"` all along, but
+  the loader silently dropped it. Now `base` is a first-class
+  partial in both fetch and inline modes.
+- **Pin category icons use Material Icons + Map Icons fonts** instead
+  of the inline-SVG library. The host page already loads Materialize,
+  and every POI in the yuna schema stores its category as a font
+  class (`md-restaurant`, `md-hiking`, `map-swimming`, `map-bakery`,
+  etc.). `pin.html` now renders `<i class="{{iconClass}}">`; the
+  engine's existing `resolveIconClass()` picks `md-*` / `map-*` /
+  `fa-<type>` per the legacy rule. Inline SVG library stays as a
+  fallback for skins that opted into `{{{iconSvg}}}`.
+- Files touched: `engine/core/skin-loader.js`,
+  `engine/features/markers.js`,
+  `skins/innsight2026/pin.html`,
+  `skins/innsight2026/skin.css`.
+
 ## 0.7.20 - 2026-05-14
 
 - **Base latitude / longitude fields in Settings → Design**. Direct
