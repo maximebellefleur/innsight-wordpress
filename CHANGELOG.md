@@ -1,4 +1,14 @@
 # Changelog
+## 0.7.29 - 2026-08-12
+
+- **Fix PHP fatal introduced in 0.7.28.** `render_icon_class()`'s
+  docblock contained the literal `md-*/map-*` — the `*/` terminated
+  the docblock early, leaving `map- codepoints)` as bare PHP that
+  PHP rejected with "syntax error, unexpected identifier map".
+  Whole admin page white-screened. Rephrased the comment to
+  "md- and map- codepoints".
+- Files: `includes/class-admin.php`.
+
 ## 0.7.28 - 2026-08-12
 
 - **Activities / Events icon picker is a real `<select>` now**, not

@@ -478,7 +478,7 @@ final class Admin {
 
     /**
      * Icon-class picker: <select> populated from the parsed icons.css
-     * class list (all bundled md-*/map-* codepoints), grouped by
+     * class list (all bundled md- and map- codepoints), grouped by
      * font family, plus a 36x36 preview box that renders the actual
      * glyph as soon as the admin picks an option. No typing, no
      * guessing at class names.
