@@ -477,36 +477,90 @@ final class Admin {
     }
 
     /**
-     * Icon-class input with a live glyph preview + a "browse" link
-     * to the icon reference. The preview element mirrors the input
-     * value as an added class on `.in-pin__glyph`, so any md-* /
-     * map-* class from the enqueued icons.css renders as its actual
-     * glyph via the :after codepoint.
+     * Icon-class picker: <select> populated from the parsed icons.css
+     * class list (all bundled md-*/map-* codepoints), grouped by
+     * font family, plus a 36x36 preview box that renders the actual
+     * glyph as soon as the admin picks an option. No typing, no
+     * guessing at class names.
      */
     public function render_icon_class( string $key, $value ): void {
         $input_name = self::OPTION_NAME . '[' . $key . ']';
-        $input_id   = 'innsight-icon-input-' . $key;
+        $input_id   = 'innsight-icon-select-' . $key;
         $preview_id = 'innsight-icon-preview-' . $key;
         $val        = (string) $value;
+        $icons      = $this->available_icon_classes();
+
         printf(
-            '<input type="text" class="regular-text innsight-icon-input" id="%1$s" data-preview-target="%2$s" name="%3$s" value="%4$s" placeholder="md-restaurant" />',
+            '<select class="innsight-icon-select" id="%1$s" data-preview-target="%2$s" name="%3$s">',
             esc_attr( $input_id ),
             esc_attr( $preview_id ),
-            esc_attr( $input_name ),
-            esc_attr( $val )
+            esc_attr( $input_name )
         );
+        echo '<option value="">' . esc_html__( '— None (letter tile only) —', 'innsight' ) . '</option>';
+        // Include the current value even if it's outside the parsed
+        // list (custom class in a future skin, etc.) so saving it
+        // won't wipe the setting.
+        if ( $val !== '' && ! in_array( $val, $icons['md'], true ) && ! in_array( $val, $icons['map'], true ) ) {
+            echo '<option value="' . esc_attr( $val ) . '" selected>' . esc_html( $val . '  (custom)' ) . '</option>';
+        }
+        if ( ! empty( $icons['md'] ) ) {
+            echo '<optgroup label="' . esc_attr__( 'Material Icons (md-*)', 'innsight' ) . '">';
+            foreach ( $icons['md'] as $cls ) {
+                echo '<option value="' . esc_attr( $cls ) . '" ' . selected( $val, $cls, false ) . '>' . esc_html( $cls ) . '</option>';
+            }
+            echo '</optgroup>';
+        }
+        if ( ! empty( $icons['map'] ) ) {
+            echo '<optgroup label="' . esc_attr__( 'Map Icons (map-*)', 'innsight' ) . '">';
+            foreach ( $icons['map'] as $cls ) {
+                echo '<option value="' . esc_attr( $cls ) . '" ' . selected( $val, $cls, false ) . '>' . esc_html( $cls ) . '</option>';
+            }
+            echo '</optgroup>';
+        }
+        echo '</select>';
+
         printf(
             '<span class="innsight-icon-preview" id="%1$s" aria-hidden="true"><i class="in-pin__glyph %2$s"></i></span>',
             esc_attr( $preview_id ),
             esc_attr( $val )
         );
-        // Inline the mirror-script once per page. Guard with a static
-        // flag so multiple icon fields don't emit duplicate scripts.
+
+        // Guarded once-per-page: mirror the selected class into the
+        // preview element on change.
         static $printed_script = false;
         if ( ! $printed_script ) {
             $printed_script = true;
-            echo '<script>(function(){document.addEventListener("input",function(e){var el=e.target;if(!el.classList||!el.classList.contains("innsight-icon-input"))return;var tgt=document.getElementById(el.dataset.previewTarget);if(!tgt)return;var i=tgt.querySelector("i");if(!i)return;i.className="in-pin__glyph "+el.value.trim();});})();</script>';
+            echo '<script>(function(){document.addEventListener("change",function(e){var el=e.target;if(!el.classList||!el.classList.contains("innsight-icon-select"))return;var tgt=document.getElementById(el.dataset.previewTarget);if(!tgt)return;var i=tgt.querySelector("i");if(!i)return;i.className="in-pin__glyph "+el.value.trim();});})();</script>';
         }
+    }
+
+    /**
+     * Parse skins/innsight2026/assets/icons.css and return the sorted
+     * md-* / map-* class lists. Cached in memory per-request; the
+     * file is tiny (~200 lines) so we re-parse on every admin load
+     * rather than transient-caching. Returns array{md:string[], map:string[]}.
+     */
+    private function available_icon_classes(): array {
+        static $cache = null;
+        if ( $cache !== null ) return $cache;
+        $skin = (string) innsight_settings( 'skin_name', 'innsight2026' );
+        $path = INNSIGHT_PATH . 'skins/' . $skin . '/assets/icons.css';
+        $md = array();
+        $map = array();
+        if ( is_readable( $path ) ) {
+            $css = (string) file_get_contents( $path );
+            // Match `.in-pin__glyph.md-foo:after` and `.in-pin__glyph.map-foo:after`.
+            if ( preg_match_all( '/\.in-pin__glyph\.(md-[a-z0-9\-]+):after/i', $css, $m ) ) {
+                $md = array_values( array_unique( $m[1] ) );
+                sort( $md );
+            }
+            if ( preg_match_all( '/\.in-pin__glyph\.(map-[a-z0-9\-]+):after/i', $css, $m ) ) {
+                $map = array_values( array_unique( $m[1] ) );
+                sort( $map );
+            }
+        }
+        $cache = array( 'md' => $md, 'map' => $map );
+        return $cache;
     }
 
     public function render_number( string $key, $value ): void {

@@ -1,4 +1,15 @@
 # Changelog
+## 0.7.28 - 2026-08-12
+
+- **Activities / Events icon picker is a real `<select>` now**, not
+  a text input. Populated by parsing `skins/innsight2026/assets/icons.css`
+  at admin load, grouped into two `<optgroup>`s (Material Icons /
+  Map Icons), sorted alphabetically. Live preview still updates to
+  the glyph on change. Custom values already saved that aren't in
+  the parsed list survive as a "(custom)" option so nothing silently
+  wipes.
+- Files: `includes/class-admin.php`.
+
 ## 0.7.27 - 2026-08-12
 
 - **Live icon preview** next to the Activities / Events icon-class
