@@ -1,4 +1,38 @@
 # Changelog
+## 0.7.19 - 2026-05-14
+
+- **Distinct hike / activities / land icons** (were nearly identical
+  triangle silhouettes). hike = hiker + sun · activities = compass
+  with directional arrow · land = hills + sun.
+- **Base marker + walk rings fall back to `map.center`** when no POI
+  qualifies as the base. Previously `pickBasePoi()` returned null
+  unless a POI had `pinned:true` or `type/cat === 'hostel'`, so a
+  site with a base photo in Settings but no matching POI got no
+  marker + no rings (log said `base POI: none`). Now: if
+  `branding.base` has any photo/label/rings AND `map.center` is
+  valid, a synthetic base POI at the map centre is used as the
+  anchor. The base marker renders + walk rings draw around it.
+- Icon library gained inline comments grouping entries by purpose
+  (Eating / Movement / Getting-around / Shopping / Stay / Info /
+  Time-bound) so future edits are easier to navigate.
+- File to edit: `engine/features/markers.js` → `TYPE_SVGS`.
+
+## 0.7.18 - 2026-05-14
+
+- **Hike, activities, and land now have visually distinct icons**.
+  Previously activities was the same triangle as hike (just missing
+  the sun dot), and land was a very similar mountain silhouette. Now:
+  - **hike**: hiker figure with a small sun (upper right).
+  - **activities**: compass with a directional arrow.
+  - **land**: hills with a small sun.
+- Cosmetic: added inline comments in `TYPE_SVGS` grouping icons by
+  purpose (Eating, Movement, Getting-around, Shopping, Stay, Info,
+  Time-bound) so future edits are easier to navigate.
+- **Where to edit**: `engine/features/markers.js`, the `TYPE_SVGS`
+  object. Key = POI type slug (`hike`, `food`, `bar`, …), value =
+  raw 14x14 inline SVG stroked with `currentColor`. Add new entries
+  for any new POI type.
+
 ## 0.7.17 - 2026-05-14
 
 - **Default zoom level is now a Setting**. Settings → Innsight →

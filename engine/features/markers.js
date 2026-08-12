@@ -26,25 +26,43 @@
      * unknown. Deliberately small (14x14) - the icon slot is only
      * ~22px wide.
      */
+    // Icon library. Every POI type gets a distinct 14x14 monoline
+    // glyph, currentColor stroked. Edit these paths to change what
+    // shows in a pin's right-hand slot. Add new entries for new
+    // types (matched against poi.type, then poi.cat).
     var TYPE_SVGS = {
-        food:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 1v5.5A1 1 0 0 0 5 7.5v5M4 1V4M4 1L3 4V6M4 4H3M9.5 1v5c0 .5-.3 1-1 1v5.5M9.5 1c1 .5 1.5 2 1.5 3.5 0 1-.5 2-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        eats:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 1v5.5A1 1 0 0 0 5 7.5v5M4 1V4M4 1L3 4V6M4 4H3M9.5 1v5c0 .5-.3 1-1 1v5.5M9.5 1c1 .5 1.5 2 1.5 3.5 0 1-.5 2-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        bar:        '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2h10L8 7v4M4 11h6M8 7v0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        drinks:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2h10L8 7v4M4 11h6M8 7v0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        hike:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 11.5L5.5 5l2.5 4 2-3 2.5 5.5H1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.7" cy="3" r=".9" fill="currentColor"/></svg>',
-        activities: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 11.5L5.5 5l2.5 4 2-3 2.5 5.5H1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-        transport:  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="2.5" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8h9M4 9.5v2M10 9.5v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="4.5" cy="6.5" r=".7" fill="currentColor"/><circle cx="9.5" cy="6.5" r=".7" fill="currentColor"/></svg>',
+        // Eating / drinking
+        food:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.5 1v5c0 .55.45 1 1 1v5.5M3.5 1v3.5M3.5 1L2.5 4v1.5c0 .3.2.5.5.5M9.5 1v5.5c0 .3.2.5.5.5v4.5M9.5 1c1.2.4 2 2 2 3.5 0 1.2-.6 2.3-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        eats:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.5 1v5c0 .55.45 1 1 1v5.5M3.5 1v3.5M3.5 1L2.5 4v1.5c0 .3.2.5.5.5M9.5 1v5.5c0 .3.2.5.5.5v4.5M9.5 1c1.2.4 2 2 2 3.5 0 1.2-.6 2.3-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        bar:        '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2.5h10L8 7.5v3.5M4.5 11h7M4.5 2.5l3.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        drinks:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2.5h10L8 7.5v3.5M4.5 11h7M4.5 2.5l3.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+        // Movement / activities - each visually distinct
+        hike:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9.5" cy="2.5" r="1.2" stroke="currentColor" stroke-width="1.3"/><path d="M5 12l1.5-3-2-1.5 3-2 2 3 2 1.5M3 8l1 1M8 4.5L6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        activities: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="8" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 8L12 4.5M9 4l3-.5-.5 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        land:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12l3.5-6.5L7 9.5l2-4 4 6.5H1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="11" cy="3" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>',
+
+        // Getting around
+        transport:  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="2.5" width="9" height="7.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 8h9M4 10v1.5M10 10v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="4.5" cy="6.5" r=".7" fill="currentColor"/><circle cx="9.5" cy="6.5" r=".7" fill="currentColor"/></svg>',
+
+        // Shopping
         shop:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5h9l-.7 7.5H3.2l-.7-7.5zM5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         shops:      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5h9l-.7 7.5H3.2l-.7-7.5zM5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+        // Stay / places
         hostel:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V6l5-3.5L12 6v6M5.5 12V8h3v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         place:      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1.5c-2.2 0-4 1.7-4 3.9C3 8.4 7 12.5 7 12.5s4-4.1 4-7.1c0-2.2-1.8-3.9-4-3.9z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="7" cy="5.3" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>',
         city:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V5l3-2 3 2v7M8 12V7l3-2v7M2 12h10M4 7h1M4 9h1M9.5 8v1M9.5 10v1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+        // Info / civic
         sights:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 7s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>',
-        land:       '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 11l3-6 2 3 2.5-5 4.5 8H1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
         public:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V6h10v6M2 6l5-4 5 4M6 12V9h2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+        // Time-bound
         event:      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="3" width="9" height="8.5" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 5.5h9M4.5 2v2M9.5 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
         events:     '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="3" width="9" height="8.5" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 5.5h9M4.5 2v2M9.5 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-        // Fallback - a neutral dot when the type isn't in the library.
+
+        // Fallback - neutral dot when the type isn't in the library.
         _default:   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="2" fill="currentColor"/></svg>'
     };
 
@@ -96,17 +114,37 @@
 
     /**
      * Resolve the POI that should be rendered as the "home base".
-     * Mirrors the priority order the skin's findHostelRef() uses, so
-     * the marker and the "distance from base" list labels can never
-     * disagree:
+     * Priority:
      *   1. First POI with pinned === true
      *   2. Else first POI with type/cat === 'hostel'
-     *   3. Else null (no base marker; map.center is NOT auto-promoted)
+     *   3. Else - if the admin has configured a Base photo / label /
+     *      rings in Settings AND the map has a valid center - a
+     *      SYNTHETIC POI at map.center. This is the "I set a base
+     *      photo but no POI was marked as the hostel" case; the
+     *      marker + rings still render at the map's centre so the
+     *      admin sees their config take effect.
+     *   4. Else null (no base marker at all).
      */
-    function pickBasePoi(pois) {
+    function pickBasePoi(pois, config) {
         for (var i = 0; i < pois.length; i++) if (pois[i].pinned) return pois[i];
         for (var j = 0; j < pois.length; j++) {
             if (pois[j].type === 'hostel' || pois[j].cat === 'hostel') return pois[j];
+        }
+        // Fallback: use map.center as anchor when Base settings exist.
+        var b = (config && config.branding && config.branding.base) || {};
+        var hasBaseConfig = !!(b.photo || b.label || (b.rings && b.rings.length));
+        var c = config && config.map && config.map.center;
+        if (hasBaseConfig && c && isFinite(c.lat) && isFinite(c.lon)) {
+            return {
+                id: '__innsight_base_synthetic',
+                title: b.label || 'Base',
+                lat: Number(c.lat),
+                lon: Number(c.lon),
+                type: 'hostel',
+                cat: 'hostel',
+                pinned: true,
+                __synthetic: true
+            };
         }
         return null;
     }
@@ -147,7 +185,7 @@
         // Which POI (if any) is the "home base"? Rendered as base.html
         // instead of pin.html, non-interactive, and pushed to a special
         // group so filters can't hide it.
-        var basePoi = partials.base ? pickBasePoi(config.pois) : null;
+        var basePoi = partials.base ? pickBasePoi(config.pois, config) : null;
         // Debug: log whether the base was found + what branding.base
         // carries, so it's obvious when the admin uploaded a photo in
         // Settings but it never made it into the JSON config.
@@ -189,6 +227,21 @@
         Object.keys(groupTypes).forEach(function (type) {
             provider.showCluster(groupTypes[type]);
         });
+
+        // Synthetic base (map.center fallback) - the forEach above
+        // didn't render it because it's not in config.pois. Add it
+        // now as a plain non-interactive marker.
+        if (basePoi && basePoi.__synthetic) {
+            var iconHtml2 = buildIconHtml(basePoi, partials, config, true);
+            provider.addMarker({
+                lat: basePoi.lat, lon: basePoi.lon,
+                iconHtml: iconHtml2,
+                iconClassName: 'innsight-base-host',
+                popupHtml: '',
+                data: basePoi,
+                onClick: null, onPopupOpen: null
+            });
+        }
 
         // Walk rings around the base. Rendered as GeoJSON circle
         // polygons + minute-label DOM chips at bearing 135°. Both
