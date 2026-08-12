@@ -71,6 +71,28 @@
         return TYPE_SVGS[key] || TYPE_SVGS._default;
     }
 
+    /**
+     * Colour for the POI, sourced from the same categories list the
+     * filter chips render. Guarantees the pin's letter tile matches
+     * the colour of its filter chip's dot — same input, same lookup.
+     * Falls back to a hashed sticker-palette pick when the POI's
+     * type/cat isn't in the categories list.
+     */
+    function resolveCategoryColor(poi, config) {
+        var cats = (config && config.categories) || [];
+        var key = String(poi.cat || poi.type || '').toLowerCase();
+        for (var i = 0; i < cats.length; i++) {
+            var c = cats[i];
+            if (c && String(c.id).toLowerCase() === key && c.color) return c.color;
+        }
+        var palette = (config && config.branding && config.branding.stickerColors) ||
+            ['#FFB85C', '#FF6B3D', '#C9F73F', '#6BB7FF', '#FF4D8F', '#B07AFF', '#FFD93D', '#5EE2A8'];
+        var hash = 0;
+        var id = String(poi.id || poi.title || key);
+        for (var j = 0; j < id.length; j++) hash = (hash + id.charCodeAt(j)) % 1e9;
+        return palette[hash % palette.length];
+    }
+
     function buildIconHtml(poi, partials, config, isBase) {
         // Skin can supply a per-pin template (the 'pin' partial). If present,
         // it owns the entire marker DOM - the engine no longer wraps the icon
@@ -164,17 +186,13 @@
     /**
      * Pin-template render context. Adds two computed fields on top of the POI:
      *   - initial: first character of name (uppercase)
-     *   - stickerColor: hashed-from-id color from config.branding.stickerColors
-     *     (or a sensible default palette).
+     *   - stickerColor: color of the POI's category (matches the filter
+     *     chip dot exactly). Falls back to a hashed-from-id color when
+     *     the POI's cat/type isn't in the categories list (unknown type).
      * The skin can use {{stickerColor}} as a CSS custom property, etc.
      */
     function buildPinContext(poi, config) {
-        var palette = (config && config.branding && config.branding.stickerColors) ||
-            ['#FFB85C', '#FF6B3D', '#C9F73F', '#6BB7FF', '#FF4D8F', '#B07AFF', '#FFD93D', '#5EE2A8'];
-        var hash = 0;
-        var id = String(poi.id || poi.title || '');
-        for (var i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i)) % 1e9;
-        var color = palette[hash % palette.length];
+        var color = resolveCategoryColor(poi, config);
         var ctx = {};
         for (var k in poi) if (Object.prototype.hasOwnProperty.call(poi, k)) ctx[k] = poi[k];
         ctx.initial = (poi.title || poi.name || '·').charAt(0).toUpperCase();

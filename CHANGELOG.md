@@ -1,4 +1,27 @@
 # Changelog
+## 0.7.22 - 2026-08-12
+
+- **Pin colour = filter chip colour.** The chip dots use each
+  category's `color` from the emitted `categories` list, but pin
+  sticker colour was hashed from the POI id — no relationship. A
+  Food pin got a random palette pick regardless of the orange dot
+  on the Food chip. Now `buildPinContext()` in
+  `engine/features/markers.js` looks up the POI's `cat`/`type` in
+  `config.categories` and uses that colour; falls back to the
+  hashed palette only when the type isn't in the list. Sheet, list
+  and Saved-row stickers also prefer the category colour (still fall
+  back to the hash for unknown types).
+- **Tighter top-chrome ↔ map spacing.** The chip row had 14px of
+  bottom padding and the "spots nearby" pill sat 14px further down
+  at `top: 222px`, so ~28px of dead cream sat between the filters
+  and the pill. Cut chip padding to `10px 16px 6px`, moved
+  `.in-nearby` to `top: 198px`, and moved `.in-mapctl` (zoom +
+  fullscreen column) to `top: 208px` — same relative offset from
+  the pill as before, just 24px higher overall.
+- Files: `engine/features/markers.js`,
+  `skins/innsight2026/skin.js`,
+  `skins/innsight2026/skin.css`.
+
 ## 0.7.21 - 2026-08-12
 
 - **Walk rings + base marker now actually render.** Root cause: the
