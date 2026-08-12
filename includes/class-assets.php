@@ -36,6 +36,7 @@ final class Assets {
     private const HANDLE_MAPBOX_GL_CSS     = 'innsight-mapbox-gl-css';
     private const HANDLE_ENGINE            = 'innsight-engine';
     private const HANDLE_SKIN_CSS          = 'innsight-skin-css';
+    private const HANDLE_SKIN_ICONS_CSS    = 'innsight-skin-icons-css';
     private const HANDLE_SKIN_JS           = 'innsight-skin-js';
 
     private const MAPBOX_GL_VERSION = '3.5.1';
@@ -112,15 +113,19 @@ final class Assets {
         }
         wp_enqueue_style( self::HANDLE_SKIN_CSS );
 
-        // Inline @font-face with ABSOLUTE URLs. Relative URLs inside the
-        // bundled skin.css break the moment any CSS-optimiser plugin
-        // (Autoptimize, WP Rocket, LiteSpeed, Perfmatters, ...) moves
-        // skin.css into /wp-content/cache/... - the fonts then resolve
-        // under the cache directory and 404, and the ligature text
-        // ("restaurant", "hiking", ...) renders as plain text in every
-        // pin. Emitting the @font-face here with absolute URLs sidesteps
-        // that class of failure regardless of the optimiser.
+        // Icon-font @font-face + legacy yuna codepoint mappings
+        // (baseline.css md-* + map.css map-*). Enqueued as a separate
+        // stylesheet so its URL is absolute (a CSS-optimiser plugin
+        // that moves skin.css into /wp-content/cache/ won't break the
+        // codepoint rules), AND we emit the @font-face inline with
+        // absolute font URLs so those cannot 404 either.
         if ( $skin === 'innsight2026' ) {
+            $icons_css_url  = INNSIGHT_URL  . 'skins/' . $skin . '/assets/icons.css';
+            $icons_css_path = INNSIGHT_PATH . 'skins/' . $skin . '/assets/icons.css';
+            $icons_ver = file_exists( $icons_css_path ) ? (string) filemtime( $icons_css_path ) : INNSIGHT_VERSION;
+            wp_register_style( self::HANDLE_SKIN_ICONS_CSS, $icons_css_url, array( self::HANDLE_SKIN_CSS ), $icons_ver );
+            wp_enqueue_style( self::HANDLE_SKIN_ICONS_CSS );
+
             $fonts_url = INNSIGHT_URL . 'skins/' . $skin . '/assets/fonts/';
             $font_face = sprintf(
                 '@font-face{font-family:"Innsight Material Icons";font-style:normal;font-weight:400;font-display:block;'
@@ -131,7 +136,7 @@ final class Assets {
                 . 'src:url(%1$smap.ttf) format("truetype")}',
                 esc_url( $fonts_url )
             );
-            wp_add_inline_style( self::HANDLE_SKIN_CSS, $font_face );
+            wp_add_inline_style( self::HANDLE_SKIN_ICONS_CSS, $font_face );
         }
 
         // Re-enqueue every engine module handle so they all print.

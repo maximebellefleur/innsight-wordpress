@@ -1,4 +1,23 @@
 # Changelog
+## 0.7.25 - 2026-08-12
+
+- **Icon rendering: switched from ligatures to legacy yuna codepoint
+  mapping.** Verbatim port of the working `yuna-innsight/css/baseline.css`
+  (md-* rules) and `yuna-innsight/css/map.css` (map-* rules) into
+  `skins/innsight2026/assets/icons.css`. Every rule scoped with
+  `.in-pin__glyph` so a theme/plugin that also defines `.md-restaurant`
+  can't collide. Icons render via `:after { content: '\eXXX' }` —
+  no ligature magic, no font-detection, no runtime fallback logic:
+  the browser paints the glyph or nothing. `pin.html` back to
+  `<i class="in-pin__glyph {{iconClass}}">` (empty element, class-only).
+  Dead `iconMetaForPoi()` / `iconFontClass` / `iconLigature` removed
+  from `markers.js`. `icons.css` enqueued as a separate WP stylesheet
+  (dependent on skin.css) so its URL is absolute; the @font-face still
+  emits inline with absolute font URLs so CSS optimisers can't 404 them.
+- Files: `includes/class-assets.php`, `engine/features/markers.js`,
+  `skins/innsight2026/pin.html`, `skins/innsight2026/skin.css`,
+  `skins/innsight2026/assets/icons.css` (new, 199 lines).
+
 ## 0.7.24 - 2026-08-12
 
 - **Icon-font @font-face now uses absolute URLs.** The relative
