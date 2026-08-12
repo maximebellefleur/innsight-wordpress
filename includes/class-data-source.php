@@ -144,6 +144,8 @@ final class DataSource {
     }
 
     private function resolve_zoom( array $args, int $post_id ): int {
+        // Priority: shortcode `zoom` attr > per-post ACF map_zoom_level >
+        // site-wide default from Settings > 12 as absolute last resort.
         if ( isset( $args['zoom'] ) && is_numeric( $args['zoom'] ) ) {
             return max( 1, min( 20, (int) $args['zoom'] ) );
         }
@@ -151,7 +153,8 @@ final class DataSource {
         if ( is_numeric( $field ) ) {
             return max( 1, min( 20, (int) $field ) );
         }
-        return 12;
+        $default = (int) innsight_settings( 'default_zoom', 12 );
+        return max( 1, min( 20, $default ) );
     }
 
     private function resolve_logo_url(): string {

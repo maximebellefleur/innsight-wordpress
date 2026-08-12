@@ -1,4 +1,13 @@
 # Changelog
+## 0.7.17 - 2026-05-14
+
+- **Default zoom level is now a Setting**. Settings → Innsight →
+  Render mode & UI → "Default zoom level" (int 1-20, default 12).
+  Used as the fallback when neither the `[innsight_map zoom="X"]`
+  shortcode attribute nor a per-post `map_zoom_level` ACF value is
+  set. DataSource's hardcoded `return 12` replaced with
+  `innsight_settings('default_zoom', 12)`.
+
 ## 0.7.16 - 2026-05-14
 
 Three fixes on the map layer:

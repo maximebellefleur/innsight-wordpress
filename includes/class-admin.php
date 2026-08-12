@@ -110,6 +110,7 @@ final class Admin {
         $this->add_field( 'places_cron_enabled', __( 'Nightly Places cron', 'innsight' ), 'innsight_enrichment', 'render_checkbox', __( 'Runs at 03:00 site time; refreshes up to 25 stale POIs per night so most sheet opens hit a hot cache. Leave off if API quota matters more than latency on first open.', 'innsight' ) );
 
         $this->add_field( 'render_mode', __( 'Render mode', 'innsight' ), 'innsight_render', 'render_render_mode' );
+        $this->add_field( 'default_zoom', __( 'Default zoom level', 'innsight' ), 'innsight_render', 'render_number', __( 'Used when neither the [innsight_map zoom="X"] shortcode attribute nor a per-post "Map Zoom Level" ACF value is set. Range 1-20; typical: 10 = region, 12 = city, 14 = neighbourhood, 16 = street.', 'innsight' ) );
         $this->add_field( 'kml_export', __( 'Show KML download button', 'innsight' ), 'innsight_render', 'render_checkbox' );
         $this->add_field( 'solo_mode', __( 'Solo Mode toggle available', 'innsight' ), 'innsight_render', 'render_checkbox' );
         $this->add_field( 'live_location', __( 'Show user\'s live location', 'innsight' ), 'innsight_render', 'render_checkbox', __( 'Asks the browser for the user\'s coordinates and drops a pulsing marker on the map.', 'innsight' ) );

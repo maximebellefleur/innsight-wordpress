@@ -58,6 +58,11 @@ final class Settings {
             'kml_export'           => 1,
             'solo_mode'            => 1,
 
+            // Default zoom level - used when neither the shortcode
+            // `zoom` attribute nor the per-post `map_zoom_level` ACF
+            // field is set. Range 1-20; typical: 10-14 for a city.
+            'default_zoom'         => 12,
+
             // Live location: when enabled, the engine asks the browser for
             // the user's coordinates and drops a pulsing marker on the map.
             // The icon can be any single character (emoji recommended) -
@@ -169,6 +174,8 @@ final class Settings {
         $clean['places_cron_enabled']  = ! empty( $raw['places_cron_enabled'] ) ? 1 : 0;
         $clean['kml_export']           = ! empty( $raw['kml_export'] ) ? 1 : 0;
         $clean['solo_mode']            = ! empty( $raw['solo_mode'] ) ? 1 : 0;
+        // Default zoom - clamped to Mapbox's usable range.
+        $clean['default_zoom']         = isset( $raw['default_zoom'] ) ? max( 1, min( 20, (int) $raw['default_zoom'] ) ) : (int) $defaults['default_zoom'];
         $clean['live_location']        = ! empty( $raw['live_location'] ) ? 1 : 0;
         // Single grapheme allowed - usually one emoji. Strip tags so a
         // theme injection can't sneak in HTML attrs through the field.
