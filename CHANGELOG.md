@@ -1,4 +1,29 @@
 # Changelog
+## 0.7.26 - 2026-08-12
+
+- **Per-post-type icon in Settings → Design**. Two new fields:
+  `Activities icon class` (default `md-directions-run`) and
+  `Events icon class` (default `md-event`). Any `md-*`/`map-*` class
+  shipped in `assets/icons.css` works. `portfolio_post_to_marker()`
+  and `event_post_to_marker()` now read those settings instead of
+  the previous hardcoded `stabilization-action` / empty string.
+- **Walk-ring unit selector**. New `Ring unit` setting: `Minutes
+  walking (80 m / min)` (default, matches the old behaviour), `Kilometres`,
+  or `Metres`. `base_rings` now accepts fractional values ("0.5, 1,
+  2" for km). `build_base_config()` converts server-side to metres
+  and emits `ringRadii` + `ringUnit`; `addWalkRings()` takes radii
+  in metres directly and labels chips with the raw value + unit
+  ("5 MIN" / "2 KM" / "500 M").
+- **Base marker sits behind POI pins**. `.innsight-base-host` z-index
+  1, `.innsight-pin-host` z-index 5, `.innsight-base-ring-host` z-index
+  2. Previously the polaroid rendered on top of nearby pins because
+  it was added last to the DOM.
+- Files: `includes/class-settings.php`, `includes/class-admin.php`,
+  `includes/class-data-source.php`, `includes/class-json-builder.php`,
+  `engine/features/markers.js`,
+  `engine/providers/mapbox-gl-provider.js`,
+  `skins/innsight2026/skin.css`.
+
 ## 0.7.25 - 2026-08-12
 
 - **Icon rendering: switched from ligatures to legacy yuna codepoint

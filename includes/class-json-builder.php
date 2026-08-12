@@ -264,11 +264,19 @@ final class JsonBuilder {
         $raw = trim( (string) ( $settings['base_rings'] ?? '' ) );
         if ( $raw !== '' ) {
             foreach ( preg_split( '/[,\s]+/', $raw ) as $n ) {
-                $n = (int) $n;
-                if ( $n > 0 && $n <= 120 ) $rings[] = $n;
+                $n = (float) $n;
+                if ( $n > 0 && $n <= 200 ) $rings[] = $n;
             }
         }
-        $out['rings'] = array_values( array_unique( $rings ) );
+        $rings = array_values( array_unique( $rings, SORT_NUMERIC ) );
+        $out['rings'] = $rings;
+
+        // Unit governs geometry AND chip labels. Convert to metres
+        // server-side so the client never has to know the mode.
+        $unit = in_array( $settings['base_ring_unit'] ?? '', array( 'min', 'km', 'm' ), true ) ? $settings['base_ring_unit'] : 'min';
+        $mult = $unit === 'km' ? 1000.0 : ( $unit === 'm' ? 1.0 : 80.0 /* min → m at 80 m/min walking */ );
+        $out['ringUnit']  = $unit;
+        $out['ringRadii'] = array_map( function ( $n ) use ( $mult ) { return (float) ( $n * $mult ); }, $rings );
 
         // Explicit coordinates take priority over the POI-list scan.
         $lat = (string) ( $settings['base_lat'] ?? '' );

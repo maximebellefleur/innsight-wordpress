@@ -250,16 +250,17 @@
      * All layers/labels hide below zoom 13 - at city scale they
      * cover the whole viewport and mean nothing.
      */
-    MapboxGLProvider.prototype.addWalkRings = function (lat, lon, minutes) {
-        if (!minutes || !minutes.length) return;
+    MapboxGLProvider.prototype.addWalkRings = function (lat, lon, radiiM, unit, rawValues) {
+        if (!radiiM || !radiiM.length) return;
         // Deterministic id so re-calls (e.g. after a filter re-render)
         // replace rather than stack.
         var self = this;
         var sourceId = 'innsight-base-rings';
-        var METRES_PER_MIN = 80;
         var MIN_ZOOM = 11;  // was 13 - too aggressive; visitors landing at zoom 10-12 saw nothing.
+        unit = unit || 'min';
+        rawValues = rawValues || radiiM;
         if (root.console && root.console.info) {
-            root.console.info('[innsight] walk rings around', lat.toFixed(4), lon.toFixed(4), '- minutes:', minutes, '- visible at zoom ≥', MIN_ZOOM);
+            root.console.info('[innsight] walk rings around', lat.toFixed(4), lon.toFixed(4), '- radii (m):', radiiM, '- unit:', unit, '- visible at zoom ≥', MIN_ZOOM);
         }
 
         function metersToPolygon(centerLat, centerLon, radiusM, steps) {
@@ -280,13 +281,15 @@
             return pts;
         }
 
-        // Sorted so the outer ring paints first (fill only on inner).
-        var minsSorted = minutes.slice().sort(function (a, b) { return a - b; });
-        var features = minsSorted.map(function (min, idx) {
+        // Pair radius (metres) with its raw value (for chip label) so
+        // we don't lose the display number after sorting.
+        var pairs = radiiM.map(function (r, i) { return { r: r, raw: rawValues[i] }; });
+        pairs.sort(function (a, b) { return a.r - b.r; });
+        var features = pairs.map(function (p, idx) {
             return {
                 type: 'Feature',
-                geometry: { type: 'Polygon', coordinates: [ metersToPolygon(lat, lon, min * METRES_PER_MIN) ] },
-                properties: { minutes: min, order: idx }
+                geometry: { type: 'Polygon', coordinates: [ metersToPolygon(lat, lon, p.r) ] },
+                properties: { radius: p.r, order: idx }
             };
         });
         var geojson = { type: 'FeatureCollection', features: features };
@@ -347,15 +350,16 @@
         var glRef = this._gl;
         var mapRef = this.native;
 
-        minsSorted.forEach(function (min) {
-            var r = min * METRES_PER_MIN;
+        var unitLabel = unit === 'km' ? ' KM' : (unit === 'm' ? ' M' : ' MIN');
+        pairs.forEach(function (p) {
+            var r = p.r;
             var dx = Math.sin(bearingRad) * r;   // east component
             var dy = Math.cos(bearingRad) * r;   // north; sin/cos flipped for compass bearing (0=N)
             var chipLat = lat + dy / mPerDegLat2;
             var chipLon = lon + dx / mPerDegLon2;
             var el = document.createElement('div');
             el.className = 'in-base__ring innsight-base-ring-host';
-            el.textContent = min + ' MIN';
+            el.textContent = p.raw + unitLabel;
             el.style.pointerEvents = 'none';
             var m = new glRef.Marker({ element: el, anchor: 'center' })
                 .setLngLat([chipLon, chipLat]);

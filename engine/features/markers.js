@@ -279,12 +279,23 @@
         }
 
         // Walk rings around the base. Rendered as GeoJSON circle
-        // polygons + minute-label DOM chips at bearing 135°. Both
-        // hide below zoom 13 (see mapbox-gl-provider.addWalkRings).
+        // polygons + DOM chip labels at bearing 135°. Both hide below
+        // MIN_ZOOM (see mapbox-gl-provider.addWalkRings). Radii + unit
+        // come from settings (min | km | m); server converts to metres,
+        // client uses metres for geometry and the raw value+unit for
+        // chip labels ("5 MIN" / "2 KM" / "500 M").
         if (basePoi && provider.addWalkRings) {
-            var rings = (config.branding && config.branding.base && config.branding.base.rings) || [];
-            if (rings && rings.length) {
-                provider.addWalkRings(basePoi.lat, basePoi.lon, rings);
+            var base   = (config.branding && config.branding.base) || {};
+            var raw    = base.rings    || [];
+            var radii  = base.ringRadii || [];
+            var unit   = base.ringUnit || 'min';
+            if (radii.length) {
+                provider.addWalkRings(basePoi.lat, basePoi.lon, radii, unit, raw);
+            } else if (raw.length) {
+                // Backwards-compat: config from an older PHP build where
+                // ringRadii wasn't emitted - fall back to the 80 m/min
+                // assumption so nothing breaks mid-upgrade.
+                provider.addWalkRings(basePoi.lat, basePoi.lon, raw.map(function (m) { return m * 80; }), 'min', raw);
             }
         }
 

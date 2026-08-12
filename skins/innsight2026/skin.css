@@ -365,7 +365,13 @@
     cursor: pointer;
     background: transparent;
     will-change: transform;
+    z-index: 5;
 }
+/* Base marker sits BEHIND every POI pin - the polaroid is a scenic
+   backdrop for the base, not a foreground element. Also below the
+   ring chips (which want to sit on top of the polaroid caption). */
+.innsight-base-host { z-index: 1 !important; }
+.innsight-base-ring-host { z-index: 2 !important; }
 /* Luggage-tag pin - two-slot layout.
  *   [ striped colored letter | white icon ]
  *              |

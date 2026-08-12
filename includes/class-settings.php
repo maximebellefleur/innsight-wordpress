@@ -101,12 +101,31 @@ final class Settings {
             'base_photo'           => 0,
             'base_label'           => '',
             'base_rings'           => '5,10',
+            // Unit for the walk-ring numbers above.
+            //   'min' - 80 m per walking minute (default; matches
+            //           original spec "5-min walk, 10-min walk").
+            //   'km'  - each entry is a kilometre radius.
+            //   'm'   - each entry is a metre radius.
+            // Only affects geometry + chip label; the CSV shape stays
+            // the same so admins don't have to re-enter numbers.
+            'base_ring_unit'       => 'min',
             // Explicit base coordinates. When set, override the
             // pinned/hostel-POI resolution AND the map.center fallback.
             // Empty = fall through to the priority chain in
             // engine/features/markers.js#pickBasePoi.
             'base_lat'             => '',
             'base_lon'             => '',
+
+            // Per-post-type icon class. The plugin ingests three kinds
+            // of markers: POIs from the `point_of_interest` taxonomy
+            // (icon comes from term meta), portfolio activities, and
+            // event posts. Activities + events don't have per-post icon
+            // fields in the legacy yuna schema, so the icon is a plugin
+            // setting. Any md-* / map-* class shipped in assets/icons.css
+            // works; blank hides the glyph and the letter tile stands
+            // alone.
+            'activities_icon'      => 'md-directions-run',
+            'events_icon'          => 'md-event',
 
             // Share-wishlist feature (innsight2026 only). When enabled, the
             // Saved tab gets a top-right Share button that lets the visitor
@@ -208,11 +227,18 @@ final class Settings {
         // Base marker fields.
         $clean['base_photo']           = isset( $raw['base_photo'] ) ? (int) $raw['base_photo'] : 0;
         $clean['base_label']           = isset( $raw['base_label'] ) ? mb_substr( wp_strip_all_tags( (string) $raw['base_label'] ), 0, 40 ) : '';
-        // Rings: comma / space separated positive integers. "5, 10" or
-        // "5,10" or empty for none.
+        // Rings: comma / space separated positive numbers. "5, 10" or
+        // "2, 5" or empty for none. Fractional km values allowed
+        // (e.g. "0.5, 1, 2") so the ring unit switcher isn't forced
+        // to whole-integer inputs.
         $rings_raw = isset( $raw['base_rings'] ) ? (string) $raw['base_rings'] : '';
-        $rings = array_filter( array_map( 'intval', preg_split( '/[,\s]+/', trim( $rings_raw ) ) ), function ( $n ) { return $n > 0 && $n <= 120; } );
+        $rings = array_filter( array_map( 'floatval', preg_split( '/[,\s]+/', trim( $rings_raw ) ) ), function ( $n ) { return $n > 0 && $n <= 200; } );
+        // Format: preserve fractional part only when non-zero, else
+        // emit the plain integer. "5.0, 10.0" reads worse than "5, 10".
+        $rings = array_map( function ( $n ) { return rtrim( rtrim( sprintf( '%.3f', $n ), '0' ), '.' ); }, $rings );
         $clean['base_rings']           = implode( ',', array_slice( array_values( array_unique( $rings ) ), 0, 4 ) );
+
+        $clean['base_ring_unit']       = in_array( $raw['base_ring_unit'] ?? '', array( 'min', 'km', 'm' ), true ) ? $raw['base_ring_unit'] : 'min';
 
         // Base coordinates - kept as strings so an empty value stays
         // truly empty (not 0.0 which would silently anchor at null-
@@ -220,6 +246,14 @@ final class Settings {
         foreach ( array( 'base_lat', 'base_lon' ) as $ck ) {
             $v = isset( $raw[ $ck ] ) ? trim( (string) $raw[ $ck ] ) : '';
             $clean[ $ck ] = is_numeric( $v ) ? $v : '';
+        }
+
+        // Per-post-type icon class. Free-text (any md-*/map-*/fa-*
+        // class shipped by the skin) - strip tags so no injection.
+        foreach ( array( 'activities_icon', 'events_icon' ) as $ck ) {
+            $v = isset( $raw[ $ck ] ) ? trim( wp_strip_all_tags( (string) $raw[ $ck ] ) ) : '';
+            // Class-name chars only: letters, digits, dash, underscore.
+            $clean[ $ck ] = preg_replace( '/[^a-zA-Z0-9_\-]/', '', $v );
         }
 
         // Share-wishlist copy. Plain-text fields the recipient sees in the

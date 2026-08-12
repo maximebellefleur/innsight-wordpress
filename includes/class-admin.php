@@ -98,7 +98,10 @@ final class Admin {
             __( 'Shown before "→ Innsight" in the header/list/saved view wordmarks. Example: "Balmers" renders as "Balmers → Innsight". Leave empty for plain "Innsight".', 'innsight' ) );
         $this->add_field( 'base_photo',     __( 'Base photo', 'innsight' ),        'innsight_design', 'render_attachment', __( 'Photo of the hostel / base location. Shown on the map as a taped-photo print above the base pin. Empty = striped placeholder.', 'innsight' ) );
         $this->add_field( 'base_label',     __( 'Base label', 'innsight' ),        'innsight_design', 'render_text',       __( 'Caption on the base marker (e.g. "Balmers"). Empty falls back to the wordmark prefix, then to the POI title.', 'innsight' ) );
-        $this->add_field( 'base_rings',     __( 'Walk-time rings (min)', 'innsight' ), 'innsight_design', 'render_text',   __( 'Comma-separated minutes for the dashed circles around the base (e.g. "5,10"). 80 m / walking minute. Empty = no rings.', 'innsight' ) );
+        $this->add_field( 'base_rings',     __( 'Ring distances', 'innsight' ),        'innsight_design', 'render_text',   __( 'Comma-separated numbers for the dashed circles around the base. Interpreted by the unit below. e.g. "5,10" with unit=min → 5-min & 10-min walks (80 m / min); "2,5" with unit=km → 2 km + 5 km radii. Max 4 rings. Empty = no rings.', 'innsight' ) );
+        $this->add_field( 'base_ring_unit', __( 'Ring unit', 'innsight' ),             'innsight_design', 'render_ring_unit', __( 'How to interpret the numbers above.', 'innsight' ) );
+        $this->add_field( 'activities_icon',__( 'Activities icon class', 'innsight' ), 'innsight_design', 'render_text',   __( 'Icon class used for every "portfolio" (activities) post. Any md-* / map-* class from skins/innsight2026/assets/icons.css works. Examples: md-directions-run, md-hiking, md-park, map-natural-feature. Empty hides the icon and shows only the letter tile.', 'innsight' ) );
+        $this->add_field( 'events_icon',    __( 'Events icon class', 'innsight' ),     'innsight_design', 'render_text',   __( 'Icon class used for every "event" post. Any md-*/map-* class works. Default: md-event.', 'innsight' ) );
         $this->add_field( 'base_lat',       __( 'Base latitude',  'innsight' ), 'innsight_design', 'render_text', __( 'Decimal degrees (e.g. 46.6822 for Balmers Hostel). Overrides the pinned/hostel POI + map-center fallback. Leave empty to auto-detect from the POI list.', 'innsight' ) );
         $this->add_field( 'base_lon',       __( 'Base longitude', 'innsight' ), 'innsight_design', 'render_text', __( 'Decimal degrees (e.g. 7.8585 for Balmers Hostel). Overrides the pinned/hostel POI + map-center fallback.', 'innsight' ) );
 
@@ -407,6 +410,19 @@ final class Admin {
         $opts = array(
             'inline' => __( 'Inline (faster: no extra HTTP roundtrip)', 'innsight' ),
             'fetch'  => __( 'Fetch (engine fetches /wp-json/innsight/v1/map)', 'innsight' ),
+        );
+        echo '<select name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '">';
+        foreach ( $opts as $k => $label ) {
+            echo '<option value="' . esc_attr( $k ) . '" ' . selected( $value, $k, false ) . '>' . esc_html( $label ) . '</option>';
+        }
+        echo '</select>';
+    }
+
+    public function render_ring_unit( string $key, $value ): void {
+        $opts = array(
+            'min' => __( 'Minutes walking (80 m / min)', 'innsight' ),
+            'km'  => __( 'Kilometres', 'innsight' ),
+            'm'   => __( 'Metres', 'innsight' ),
         );
         echo '<select name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '">';
         foreach ( $opts as $k => $label ) {
