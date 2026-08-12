@@ -220,6 +220,7 @@
         this.bindShareControls();
         this.bindReceiveControls();
         this.startLiveLocation();
+        this.bindBaseHover();
         this.updateCounts();
         // Sync route class on first render so CSS scope variants apply.
         this.setRoute('map');
@@ -317,6 +318,40 @@
      * Updates the marker as the watch reports new positions so the dot
      * tracks the user.
      */
+    /**
+     * Base polaroid hover lift.
+     * On mouseover of the .in-base marker we add .is-lifted to both
+     * the polaroid AND its Mapbox marker host (.innsight-base-host)
+     * so the z-index bump applies to the whole marker, not just the
+     * animated <div> inside. The CSS keyframe runs for ~3s and then
+     * animationend removes the class, dropping z-index back to 1.
+     *
+     * Uses event delegation on the app container: `.in-base` doesn't
+     * exist yet at boot time (it's inside a Mapbox HTML marker added
+     * asynchronously) so a direct bind would miss.
+     */
+    SkinController.prototype.bindBaseHover = function () {
+        var root = this.target || document;
+        root.addEventListener('mouseover', function (e) {
+            var base = e.target && e.target.closest && e.target.closest('.in-base');
+            if (!base || base.classList.contains('is-lifted')) return;
+            var host = base.closest('.innsight-base-host');
+            base.classList.add('is-lifted');
+            if (host) host.classList.add('is-lifted');
+        });
+        // Once the keyframe finishes, drop the class so a next hover
+        // can re-trigger it. Listen on the polaroid element (the one
+        // the animation runs on).
+        root.addEventListener('animationend', function (e) {
+            if (e.animationName !== 'in-base-lift') return;
+            var base = e.target && e.target.closest && e.target.closest('.in-base');
+            if (!base) return;
+            var host = base.closest('.innsight-base-host');
+            base.classList.remove('is-lifted');
+            if (host) host.classList.remove('is-lifted');
+        }, true);
+    };
+
     SkinController.prototype.startLiveLocation = function () {
         var liveCfg = (this.cfg.ui && this.cfg.ui.liveLocation) || {};
         if (!liveCfg.enabled) return;

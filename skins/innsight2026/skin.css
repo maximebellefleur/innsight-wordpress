@@ -2087,7 +2087,26 @@ body.innsight-sheet-locked {
     border: 1.5px solid var(--in-ink);
     box-shadow: 4px 5px 0 rgba(15, 15, 15, 0.85);
     transform: rotate(-6deg);
+    transform-origin: 50% 100%;
     animation: in-pin-pop 0.55s cubic-bezier(.5, 1.6, .4, 1) both;
+    cursor: pointer;
+    pointer-events: auto;
+}
+/* Hover lift: the .is-lifted class is added by JS on pointerenter
+ * (skin.js). The keyframe animates a "peek" — scale up, straighten
+ * out of the tilt, punch shadow, then relax back and remove itself
+ * via animationend. Runs for ~3s; z-index bumps for the duration
+ * so the polaroid pops above every pin, then falls back. */
+.innsight-base-host.is-lifted { z-index: 999 !important; }
+.in-base.is-lifted .in-base__print {
+    animation: in-base-lift 3.2s cubic-bezier(.4, 1.4, .5, 1) forwards;
+    z-index: 999;
+}
+@keyframes in-base-lift {
+    0%   { transform: rotate(-6deg) scale(1);        box-shadow: 4px 5px 0 rgba(15, 15, 15, 0.85); }
+    12%  { transform: rotate(-1deg) scale(1.18);      box-shadow: 7px 9px 0 rgba(15, 15, 15, 0.9); }
+    75%  { transform: rotate(-1deg) scale(1.18);      box-shadow: 7px 9px 0 rgba(15, 15, 15, 0.9); }
+    100% { transform: rotate(-6deg) scale(1);         box-shadow: 4px 5px 0 rgba(15, 15, 15, 0.85); }
 }
 .in-base__tape {
     position: absolute; left: -16px; top: -11px;

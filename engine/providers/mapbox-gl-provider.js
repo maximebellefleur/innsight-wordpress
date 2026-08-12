@@ -284,15 +284,34 @@
         // Pair radius (metres) with its raw value (for chip label) so
         // we don't lose the display number after sorting.
         var pairs = radiiM.map(function (r, i) { return { r: r, raw: rawValues[i] }; });
-        pairs.sort(function (a, b) { return a.r - b.r; });
-        var features = pairs.map(function (p, idx) {
+        pairs.sort(function (a, b) { return a.r - b.r; });   // ASC: smallest first
+        // Source order matters for fills: LATER features paint on TOP.
+        // We want innermost visually on top → put largest first in the
+        // source, so innermost draws last. The `order` property still
+        // labels innermost=0 for opacity interpolation.
+        var maxOrder = Math.max(0, pairs.length - 1);
+        var featuresDrawOrder = pairs.map(function (p, idx) {
+            return { p: p, order: idx };
+        }).slice().reverse();   // outermost first in source
+        var features = featuresDrawOrder.map(function (f) {
             return {
                 type: 'Feature',
-                geometry: { type: 'Polygon', coordinates: [ metersToPolygon(lat, lon, p.r) ] },
-                properties: { radius: p.r, order: idx }
+                geometry: { type: 'Polygon', coordinates: [ metersToPolygon(lat, lon, f.p.r) ] },
+                properties: { radius: f.p.r, order: f.order }
             };
         });
         var geojson = { type: 'FeatureCollection', features: features };
+
+        // Data-driven opacity: order=0 (innermost) most opaque, order=N-1
+        // (outermost) least opaque. Interpolate linearly across the ring
+        // count so 2-ring / 3-ring / 4-ring configs all look right without
+        // per-count magic numbers.
+        var fillOpacityExpr = maxOrder > 0
+            ? ['interpolate', ['linear'], ['get', 'order'], 0, 0.38, maxOrder, 0.08]
+            : 0.32;
+        var lineOpacityExpr = maxOrder > 0
+            ? ['interpolate', ['linear'], ['get', 'order'], 0, 1.00, maxOrder, 0.35]
+            : 0.85;
 
         var addLayers = function () {
             // Clean up any prior render (e.g. after a config refresh).
@@ -301,27 +320,30 @@
             if (self.native.getLayer('innsight-base-rings-line-out'))self.native.removeLayer('innsight-base-rings-line-out');
             if (self.native.getSource(sourceId))                     self.native.removeSource(sourceId);
             self.native.addSource(sourceId, { type: 'geojson', data: geojson });
-            // Inner ring fill - accent tint at 32% for a subtle
-            // "reachable zone" feel that reads at first glance.
+            // All rings get the accent-tint fill, opacity gradient
+            // per ring order. Innermost darkest, outermost softest.
             self.native.addLayer({
                 id: 'innsight-base-rings-fill', type: 'fill', source: sourceId,
                 minzoom: MIN_ZOOM,
-                filter: ['==', ['get', 'order'], 0],
-                paint: { 'fill-color': 'rgba(201,247,63,0.32)' }
+                paint: {
+                    'fill-color': 'rgb(201,247,63)',
+                    'fill-opacity': fillOpacityExpr
+                }
             });
-            // Outer stroke - solid ink line, 3.5px, no dash. Reads as
-            // a real boundary on the map instead of a suggestion.
+            // Solid ink boundary line on every ring, opacity fades with
+            // distance from the base too.
             self.native.addLayer({
                 id: 'innsight-base-rings-line-out', type: 'line', source: sourceId,
                 minzoom: MIN_ZOOM,
                 paint: {
-                    'line-color': 'rgba(15,15,15,0.85)',
+                    'line-color': 'rgb(15,15,15)',
+                    'line-opacity': lineOpacityExpr,
                     'line-width': 3.5,
                     'line-dasharray': [1, 0]
                 }
             });
-            // Inner stroke on the innermost ring - dashed accent so the
-            // 5-min core reads distinctly from the outer boundary.
+            // Dashed accent stroke on the innermost ring for extra
+            // presence at the core.
             self.native.addLayer({
                 id: 'innsight-base-rings-line-in', type: 'line', source: sourceId,
                 minzoom: MIN_ZOOM,

@@ -1,4 +1,23 @@
 # Changelog
+## 0.7.30 - 2026-08-12
+
+- **Walk rings: opacity gradient.** Innermost ring paints at
+  fill-opacity 0.38 + line-opacity 1.0; outermost fades to 0.08
+  fill + 0.35 line, linearly interpolated across the ring count
+  (works for 2 / 3 / 4 rings). Source order reversed so smaller
+  rings visually sit on top of larger ones — the reachable-zone
+  reading gets stronger as you approach the base.
+- **Base polaroid hover lift.** Mouseover the polaroid → it
+  straightens out of its tilt, scales to 1.18×, punches the
+  drop shadow, holds for ~2.5s, then eases back to its resting
+  pose. z-index jumps to 999 (above every pin) for the duration
+  of the animation, then reverts. Delegated `mouseover` handler
+  on the app root; guard on `.is-lifted` prevents re-triggering
+  mid-animation.
+- Files: `engine/providers/mapbox-gl-provider.js`,
+  `skins/innsight2026/skin.css`,
+  `skins/innsight2026/skin.js`.
+
 ## 0.7.29 - 2026-08-12
 
 - **Fix PHP fatal introduced in 0.7.28.** `render_icon_class()`'s
