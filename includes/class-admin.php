@@ -24,6 +24,47 @@ final class Admin {
     public function register(): void {
         add_action( 'admin_menu', array( $this, 'register_menu' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+    }
+
+    /**
+     * Load the skin's icons.css + @font-face on the plugin settings
+     * page so the icon-class input's live preview renders the actual
+     * glyph. Only loaded on our own page (checked via $hook prefix)
+     * to avoid bloating unrelated admin screens.
+     */
+    public function enqueue_admin_assets( string $hook ): void {
+        if ( strpos( $hook, self::PAGE_SLUG ) === false ) {
+            return;
+        }
+        $skin = (string) innsight_settings( 'skin_name', 'innsight2026' );
+        if ( $skin !== 'innsight2026' ) {
+            return;
+        }
+        $icons_url  = INNSIGHT_URL  . 'skins/' . $skin . '/assets/icons.css';
+        $icons_path = INNSIGHT_PATH . 'skins/' . $skin . '/assets/icons.css';
+        $ver = file_exists( $icons_path ) ? (string) filemtime( $icons_path ) : INNSIGHT_VERSION;
+        wp_register_style( 'innsight-admin-icons', $icons_url, array(), $ver );
+        wp_enqueue_style( 'innsight-admin-icons' );
+        $fonts_url = INNSIGHT_URL . 'skins/' . $skin . '/assets/fonts/';
+        $font_face = sprintf(
+            '@font-face{font-family:"Innsight Material Icons";font-style:normal;font-weight:400;font-display:block;'
+            . 'src:url(%1$sMaterialIcons.woff2) format("woff2"),'
+            . 'url(%1$sMaterialIcons.woff) format("woff"),'
+            . 'url(%1$sMaterialIcons.ttf) format("truetype")}'
+            . '@font-face{font-family:"Innsight Map Icons";font-style:normal;font-weight:400;font-display:block;'
+            . 'src:url(%1$smap.ttf) format("truetype")}'
+            . '.innsight-icon-preview{display:inline-flex;align-items:center;justify-content:center;'
+            . 'width:36px;height:36px;margin-left:10px;border:1px solid #c3c4c7;border-radius:6px;'
+            . 'background:#fff;vertical-align:middle;color:#1d2327;}'
+            . '.innsight-icon-preview .in-pin__glyph{font-size:22px !important;line-height:1 !important;'
+            . 'font-style:normal !important;font-weight:normal !important;letter-spacing:normal !important;'
+            . 'text-transform:none !important;display:inline-block;color:#1d2327;'
+            . '-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}'
+            . '.innsight-icon-preview .in-pin__glyph:after{display:inline-block;line-height:1;}',
+            esc_url( $fonts_url )
+        );
+        wp_add_inline_style( 'innsight-admin-icons', $font_face );
     }
 
     public function register_menu(): void {
@@ -100,8 +141,8 @@ final class Admin {
         $this->add_field( 'base_label',     __( 'Base label', 'innsight' ),        'innsight_design', 'render_text',       __( 'Caption on the base marker (e.g. "Balmers"). Empty falls back to the wordmark prefix, then to the POI title.', 'innsight' ) );
         $this->add_field( 'base_rings',     __( 'Ring distances', 'innsight' ),        'innsight_design', 'render_text',   __( 'Comma-separated numbers for the dashed circles around the base. Interpreted by the unit below. e.g. "5,10" with unit=min → 5-min & 10-min walks (80 m / min); "2,5" with unit=km → 2 km + 5 km radii. Max 4 rings. Empty = no rings.', 'innsight' ) );
         $this->add_field( 'base_ring_unit', __( 'Ring unit', 'innsight' ),             'innsight_design', 'render_ring_unit', __( 'How to interpret the numbers above.', 'innsight' ) );
-        $this->add_field( 'activities_icon',__( 'Activities icon class', 'innsight' ), 'innsight_design', 'render_text',   __( 'Icon class used for every "portfolio" (activities) post. Any md-* / map-* class from skins/innsight2026/assets/icons.css works. Examples: md-directions-run, md-hiking, md-park, map-natural-feature. Empty hides the icon and shows only the letter tile.', 'innsight' ) );
-        $this->add_field( 'events_icon',    __( 'Events icon class', 'innsight' ),     'innsight_design', 'render_text',   __( 'Icon class used for every "event" post. Any md-*/map-* class works. Default: md-event.', 'innsight' ) );
+        $this->add_field( 'activities_icon',__( 'Activities icon class', 'innsight' ), 'innsight_design', 'render_icon_class', __( 'Icon class used for every "portfolio" (activities) post. Any md-* / map-* class from skins/innsight2026/assets/icons.css works. Examples: md-directions-run, md-hiking, md-park, map-natural-feature. Preview updates as you type.', 'innsight' ) );
+        $this->add_field( 'events_icon',    __( 'Events icon class', 'innsight' ),     'innsight_design', 'render_icon_class', __( 'Icon class used for every "event" post. Any md-*/map-* class works. Default: md-event.', 'innsight' ) );
         $this->add_field( 'base_lat',       __( 'Base latitude',  'innsight' ), 'innsight_design', 'render_text', __( 'Decimal degrees (e.g. 46.6822 for Balmers Hostel). Overrides the pinned/hostel POI + map-center fallback. Leave empty to auto-detect from the POI list.', 'innsight' ) );
         $this->add_field( 'base_lon',       __( 'Base longitude', 'innsight' ), 'innsight_design', 'render_text', __( 'Decimal degrees (e.g. 7.8585 for Balmers Hostel). Overrides the pinned/hostel POI + map-center fallback.', 'innsight' ) );
 
@@ -433,6 +474,39 @@ final class Admin {
 
     public function render_text( string $key, $value ): void {
         echo '<input type="text" class="regular-text" name="' . esc_attr( self::OPTION_NAME . '[' . $key . ']' ) . '" value="' . esc_attr( (string) $value ) . '" />';
+    }
+
+    /**
+     * Icon-class input with a live glyph preview + a "browse" link
+     * to the icon reference. The preview element mirrors the input
+     * value as an added class on `.in-pin__glyph`, so any md-* /
+     * map-* class from the enqueued icons.css renders as its actual
+     * glyph via the :after codepoint.
+     */
+    public function render_icon_class( string $key, $value ): void {
+        $input_name = self::OPTION_NAME . '[' . $key . ']';
+        $input_id   = 'innsight-icon-input-' . $key;
+        $preview_id = 'innsight-icon-preview-' . $key;
+        $val        = (string) $value;
+        printf(
+            '<input type="text" class="regular-text innsight-icon-input" id="%1$s" data-preview-target="%2$s" name="%3$s" value="%4$s" placeholder="md-restaurant" />',
+            esc_attr( $input_id ),
+            esc_attr( $preview_id ),
+            esc_attr( $input_name ),
+            esc_attr( $val )
+        );
+        printf(
+            '<span class="innsight-icon-preview" id="%1$s" aria-hidden="true"><i class="in-pin__glyph %2$s"></i></span>',
+            esc_attr( $preview_id ),
+            esc_attr( $val )
+        );
+        // Inline the mirror-script once per page. Guard with a static
+        // flag so multiple icon fields don't emit duplicate scripts.
+        static $printed_script = false;
+        if ( ! $printed_script ) {
+            $printed_script = true;
+            echo '<script>(function(){document.addEventListener("input",function(e){var el=e.target;if(!el.classList||!el.classList.contains("innsight-icon-input"))return;var tgt=document.getElementById(el.dataset.previewTarget);if(!tgt)return;var i=tgt.querySelector("i");if(!i)return;i.className="in-pin__glyph "+el.value.trim();});})();</script>';
+        }
     }
 
     public function render_number( string $key, $value ): void {

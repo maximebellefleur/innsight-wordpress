@@ -1,4 +1,16 @@
 # Changelog
+## 0.7.27 - 2026-08-12
+
+- **Live icon preview** next to the Activities / Events icon-class
+  inputs in Settings → Design. Type `md-restaurant` → the actual
+  glyph renders in a 36×36 square next to the field, updating on
+  every keystroke. Uses the same `icons.css` codepoint mapping the
+  frontend uses, so what you see in Settings is exactly what renders
+  on the map.
+- Only enqueued on the Innsight admin pages (checked via `$hook`
+  prefix) to avoid bloating unrelated WP admin screens.
+- Files: `includes/class-admin.php`.
+
 ## 0.7.26 - 2026-08-12
 
 - **Per-post-type icon in Settings → Design**. Two new fields:
